@@ -1,0 +1,5 @@
+Mesa==3.5.1
+numpy
+pandas
+scipy
+tqdm
