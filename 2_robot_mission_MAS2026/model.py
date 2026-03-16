@@ -10,10 +10,12 @@ class RobotMission(Model):
     def __init__(self, N_agents=10, N_waste=10, z=10, height=10, seed=None):
         super().__init__(seed=seed)
         self.grid = MultiGrid(3*z, height, torus=False)
+        self.number_zones = 3
+        self.zone_radioactivity = {"1": (0,0.33), "2": (0.33,0.66), "3": (0.66,1)}
 
         #place agents in their respective zones
         agent_classes = [greenAgent, yellowAgent, redAgent]
-        for i in range(3):
+        for i in range(self.number_zones):
             for _ in range(N_agents):
                 agent = agent_classes[i](self)
                 x = self.random.randrange(i*z, (i+1)*z)
@@ -21,14 +23,14 @@ class RobotMission(Model):
                 self.grid.place_agent(agent, (x, y))
 
         #place radioactivity according to the zones
-        for i in range(3):
+        for i in range(self.number_zones):
             for x in range(i*z, (i+1)*z):
                 for y in range(self.grid.height):
                     radioactivity = radioactivityAgent(self, i)
                     self.grid.place_agent(radioactivity, (x, y))
 
         #place waste
-        for i in range(3):
+        for i in range(self.number_zones):
             for _ in range(N_waste):
                 x = self.random.randrange(i*z, (i+1)*z)
                 y = self.random.randrange(self.grid.height)
@@ -36,12 +38,10 @@ class RobotMission(Model):
                 self.grid.place_agent(waste, (x, y))
         
         #place waste disposal zones as last column of each zone
-        for i in range(3):
+        for i in range(self.number_zones):
             for y in range(self.grid.height):
                 waste_disposal = wasteDisposalAgent(self, i)
                 self.grid.place_agent(waste_disposal, ((i+1)*z-1, y))
-        
-
     
     def step(self):
         """Advance the model by one step."""
