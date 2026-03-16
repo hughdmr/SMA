@@ -46,4 +46,15 @@ class RobotMission(Model):
     def step(self):
         """Advance the model by one step."""
         self.agents.shuffle_do("step")
+
+    def do(self, agent, action):
+        """the “do” allows the agent to inform the environment of its actions (the results of
+the deliberation process) and, thus, the environment to apply the consequences
+of these actions. For instance, when an agent collects waste, the latter must no
+longer exist in the grid. Removing the waste is the responsibility of the
+environment.
+
+The variable percepts, returned by the method Model.do, should contain information 
+        about the adjacent tiles and their content – use a dictionary!"""
+        return {"adjacent_tiles": self.grid.get_neighborhood(agent.pos, moore=True, include_center=False)}
     
