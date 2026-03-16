@@ -4,10 +4,12 @@ from mesa import Agent
 from model import RobotMission
 
 class wasteAgent(Agent):
-    """Agent representing a piece of waste in the environment. The 'zone' attribute indicates in which zone the waste is located (0, 1, or 2)."""
+    """This agent will represent the object waste, and will have an
+attribute allowing to distinguish between green, yellow and red waste."""
     def __init__(self, model, zone):
         super().__init__(model)
         self.zone = zone
+        self.waste_type = model.random.choice(["green", "yellow", "red"])
     
 class radioactivityAgent(Agent):
     """This agent will have no behavior but two attributes: the
@@ -23,7 +25,13 @@ by Robot agents to know in which zone they are!"""
         self.radioactivity_level = model.random.uniform(self.radioactivity_range[0], self.radioactivity_range[1])
 
 class wasteDisposalAgent(Agent):
+    """this zone corresponds to a cell of the grid located
+as far to the east as possible. This cell can be chosen randomly among the eastern
+cells. The implementation of this zone can be done either by programming a new
+object agent (without behavior) or by using a radioactivated agent with a
+particular radioactivity value (this value will allow the robot agents to identify this
+cell as being the waste disposal zone)."""
     def __init__(self, model, zone):
         super().__init__(model)
         self.zone = zone
-
+        self.radioactivity_level = -1  # A distinct value to identify waste disposal zones

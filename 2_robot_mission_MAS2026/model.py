@@ -55,6 +55,33 @@ longer exist in the grid. Removing the waste is the responsibility of the
 environment.
 
 The variable percepts, returned by the method Model.do, should contain information 
-        about the adjacent tiles and their content – use a dictionary!"""
-        return {"adjacent_tiles": self.grid.get_neighborhood(agent.pos, moore=True, include_center=False)}
+        about the adjacent tiles and their content – use a dictionary!
+        
+        Moreover, the model is in charge of the execution of actions, with a method called do.
+This method should have as arguments the agent performing the action and the description of the action. It should check whether the action is feasible (each action has
+requirements, and even if the agent believes its action is feasible, it might be mistaken),
+then perform the changes entailed by the action."""
+
+        if action in ["move_up", "move_down", "move_left", "move_right"]:
+            x, y = agent.pos
+            if action == "move_up":
+                new_pos = (x, y + 1)
+            elif action == "move_down":
+                new_pos = (x, y - 1)
+            elif action == "move_left":
+                new_pos = (x - 1, y)
+            else:  # move_right
+                new_pos = (x + 1, y)
+
+            ## CHECK IF THE ACTION IS FEASIBLE
+            if self.grid.out_of_bounds(new_pos):
+                return {"error": "Move out of bounds"}
+
+        agent.pos = new_pos
+
+        percepts = {}
+        for neighbor in self.grid.get_neighborhood(agent.pos, moore=True, include_center=False):
+            percepts[neighbor] = self.grid.get_cell_list_contents([neighbor])
+
+        return percepts
     
