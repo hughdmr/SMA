@@ -1,4 +1,5 @@
-#2 16/03/2026 Hugues d'Hardemard Louis Vauterin
+#2 16/03/2026 Hugues d'Hardemare Louis Vauterin
+
 from mesa import Model
 from mesa.space import MultiGrid
 from agents import greenAgent, yellowAgent, redAgent
