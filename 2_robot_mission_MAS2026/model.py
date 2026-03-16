@@ -12,10 +12,10 @@ class RobotMission(Model):
         self.grid = MultiGrid(3*z, height, torus=False)
 
         #place agents in their respective zones
-        agents = [greenAgent(self), yellowAgent(self), redAgent(self)]
+        agent_classes = [greenAgent, yellowAgent, redAgent]
         for i in range(3):
             for _ in range(N_agents):
-                agent = agents[i]
+                agent = agent_classes[i](self)
                 x = self.random.randrange(i*z, (i+1)*z)
                 y = self.random.randrange(self.grid.height)
                 self.grid.place_agent(agent, (x, y))
