@@ -87,7 +87,9 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
             if knowledge["waste_here"]:
                 return "pick_up"
             target = knowledge["target"]
-
+        if target is None:
+            # aucun target, on fait un mouvement aléatoire pour explorer la zone
+            return self.random.choice(["move_up", "move_down", "move_left", "move_right"])
         tx, ty = target
 
         # Définition des mouvements pour se rapprocher de la target
@@ -101,16 +103,10 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
             return "move_down"
 
         return "move_left" if x > knowledge["zone_start_x"] else "move_right"
-
-    def build_percepts(self, pos):
-        percepts = {}
-        for neighbor in self.model.grid.get_neighborhood(pos, moore=True, include_center=False):
-            percepts[neighbor] = self.model.grid.get_cell_list_contents([neighbor])
-        return percepts
     
     def step_agent(self, percepts=None):
         if percepts is None:
-            percepts = self._build_percepts(self.pos)
+            percepts = self.model.build_percepts(self.pos)
 
         self.update(self.knowledge, percepts)
         action = self.deliberate(self.knowledge)

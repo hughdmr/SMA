@@ -43,6 +43,12 @@ class RobotMission(Model):
                 waste_disposal = wasteDisposalAgent(self, i)
                 self.grid.place_agent(waste_disposal, ((i+1)*z-1, y))
     
+    def build_percepts(self, pos):
+        percepts = {}
+        for neighbor in self.grid.get_neighborhood(pos, moore=True, include_center=False):
+            percepts[neighbor] = self.grid.get_cell_list_contents([neighbor])
+        return percepts
+    
     def step(self):
         """Advance the model by one step."""
         self.agents.shuffle_do("step")
@@ -77,52 +83,52 @@ then perform the changes entailed by the action."""
                 new_pos = (x + 1, y)
 
             if self.grid.out_of_bounds(new_pos):
-                return {"error": "Move out of bounds", "percepts": self._build_percepts(agent.pos)}
+                return {"error": "Move out of bounds", "percepts": self.build_percepts(agent.pos)}
 
             self.grid.move_agent(agent, new_pos)
-            return agent.build_percepts(agent.pos)
+            return self.build_percepts(agent.pos)
 
         if action == "pick_up":
             if getattr(agent, "carrying_waste", False):
-                return {"error": "Agent already carrying waste", "percepts": self._build_percepts(agent.pos)}
+                return {"error": "Agent already carrying waste", "percepts": self.build_percepts(agent.pos)}
 
             cell_objects = self.grid.get_cell_list_contents([agent.pos])
             wastes = [obj for obj in cell_objects if isinstance(obj, wasteAgent)]
             if not wastes:
-                return {"error": "No waste to pick up", "percepts": self._build_percepts(agent.pos)}
+                return {"error": "No waste to pick up", "percepts": self.build_percepts(agent.pos)}
 
             waste = wastes[0]
             waste.collect()
             self.grid.remove_agent(waste)
             agent.carrying_waste = True
             agent.carried_waste = waste
-            return agent.build_percepts(agent.pos)
+            return self.build_percepts(agent.pos)
 
         if action == "transform":
             waste = getattr(agent, "carried_waste", None)
             if not getattr(agent, "carrying_waste", False) or waste is None:
-                return {"error": "No carried waste to transform", "percepts": self._build_percepts(agent.pos)}
+                return {"error": "No carried waste to transform", "percepts": self.build_percepts(agent.pos)}
 
             waste.transform()
-            return self._build_percepts(agent.pos)
+            return self.build_percepts(agent.pos)
 
         if action == "drop":
             waste = getattr(agent, "carried_waste", None)
             if not getattr(agent, "carrying_waste", False) or waste is None:
-                return {"error": "No carried waste to drop", "percepts": self._build_percepts(agent.pos)}
+                return {"error": "No carried waste to drop", "percepts": self.build_percepts(agent.pos)}
 
             cell_objects = self.grid.get_cell_list_contents([agent.pos])
             disposals = [obj for obj in cell_objects if isinstance(obj, wasteDisposalAgent)]
             if not disposals:
-                return {"error": "Not on a disposal cell", "percepts": self._build_percepts(agent.pos)}
+                return {"error": "Not on a disposal cell", "percepts": self.build_percepts(agent.pos)}
 
             disposal = disposals[0]
             if not disposal.accepts(waste):
-                return {"error": "Waste must be transformed before drop", "percepts": self._build_percepts(agent.pos)}
+                return {"error": "Waste must be transformed before drop", "percepts": self.build_percepts(agent.pos)}
 
             agent.carrying_waste = False
             agent.carried_waste = None
-            return self._build_percepts(agent.pos)
+            return self.build_percepts(agent.pos)
 
-        return {"error": "Unknown action", "percepts": self._build_percepts(agent.pos)}
+        return {"error": "Unknown action", "percepts": self.build_percepts(agent.pos)}
     

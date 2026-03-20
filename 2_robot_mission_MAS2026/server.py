@@ -29,22 +29,30 @@ def draw_zones(ax):
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     
+    # Make the aspect ratio equal so cells are squares
+    ax.set_aspect('equal')
+    
+    # Scale the figure dynamically so it properly wraps the grid without huge whitespace margins.
+    # This ensures the browser displays the cells nicely and as large as the screen allows.
+    height_grid = y_max - y_min
+    ax.figure.set_size_inches(width * 0.5, height_grid * 0.5)
+    
     # Put a title on it to make it look nicer
     ax.set_title("Robot Waste Cleanup", fontsize=14, pad=10)
 
 def agent_portrayal(agent):
     if isinstance(agent, greenAgent):
-        return {"size": 50, "color": "green", "marker": "o", "zorder": 2}
+        return {"size": 400, "color": "green", "marker": "o", "zorder": 2}
     elif isinstance(agent, yellowAgent):
-        return {"size": 50, "color": "orange", "marker": "o", "zorder": 2} # orange is easier to see than yellow on light backgrounds
+        return {"size": 400, "color": "orange", "marker": "o", "zorder": 2} # orange is easier to see than yellow on light backgrounds
     elif isinstance(agent, redAgent):
-        return {"size": 50, "color": "red", "marker": "o", "zorder": 2}
+        return {"size": 400, "color": "red", "marker": "o", "zorder": 2}
     elif isinstance(agent, wasteAgent):
         # Distinct waste colors by zone: dark green, dark goldenrod, and dark red
         waste_colors = {0: "darkgreen", 1: "darkgoldenrod", 2: "darkred"}
-        return {"size": 25, "color": waste_colors.get(agent.zone, "black"), "marker": "s", "zorder": 1}
+        return {"size": 200, "color": waste_colors.get(agent.zone, "black"), "marker": "s", "zorder": 1}
     elif isinstance(agent, wasteDisposalAgent):
-        return {"size": 80, "color": "black", "marker": "x", "alpha": 0.3, "linewidths": 1, "zorder": 1}
+        return {"size": 1200, "color": "black", "marker": "x", "alpha": 0.3, "linewidths": 1, "zorder": 1}
     elif isinstance(agent, radioactivityAgent):
         # We don't need to draw markers for radioactivity anymore since the post_process 
         # draws the continuous zones. We can return size 0 to hide them.
