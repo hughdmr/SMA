@@ -4,24 +4,54 @@ from mesa.visualization import SolaraViz, make_space_component
 from model import RobotMission
 from agents import greenAgent, yellowAgent, redAgent
 from objects import wasteAgent, radioactivityAgent, wasteDisposalAgent
+import matplotlib.patches as patches
+
+def draw_zones(ax):
+    # This post-process function draws uniform continuous background zones 
+    # over the entire grid
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+    width = x_max - x_min
+    z = width / 3
+    
+    # Add colored rectangle patches with lower zorder so they sit behind agents
+    rect_green = patches.Rectangle((x_min, y_min), z, y_max - y_min, facecolor='green', alpha=0.2, zorder=0)
+    rect_yellow = patches.Rectangle((x_min + z, y_min), z, y_max - y_min, facecolor='yellow', alpha=0.2, zorder=0)
+    rect_red = patches.Rectangle((x_min + 2 * z, y_min), z, y_max - y_min, facecolor='red', alpha=0.2, zorder=0)
+    
+    ax.add_patch(rect_green)
+    ax.add_patch(rect_yellow)
+    ax.add_patch(rect_red)
+    
+    # Hide the axes ticks and labels for a cleaner, game-like visualization
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    
+    # Put a title on it to make it look nicer
+    ax.set_title("Robot Waste Cleanup", fontsize=14, pad=10)
 
 def agent_portrayal(agent):
     if isinstance(agent, greenAgent):
-        return {"size": 50, "color": "green", "marker": "o"}
+        return {"size": 50, "color": "green", "marker": "o", "zorder": 2}
     elif isinstance(agent, yellowAgent):
-        return {"size": 50, "color": "orange", "marker": "o"} # orange is easier to see than yellow on light backgrounds
+        return {"size": 50, "color": "orange", "marker": "o", "zorder": 2} # orange is easier to see than yellow on light backgrounds
     elif isinstance(agent, redAgent):
-        return {"size": 50, "color": "red", "marker": "o"}
+        return {"size": 50, "color": "red", "marker": "o", "zorder": 2}
     elif isinstance(agent, wasteAgent):
-        return {"size": 20, "color": "black", "marker": "s"}
+        # Distinct waste colors by zone: dark green, dark goldenrod, and dark red
+        waste_colors = {0: "darkgreen", 1: "darkgoldenrod", 2: "darkred"}
+        return {"size": 25, "color": waste_colors.get(agent.zone, "black"), "marker": "s", "zorder": 1}
     elif isinstance(agent, wasteDisposalAgent):
-        return {"size": 60, "color": "blue", "marker": "s"}
+        return {"size": 80, "color": "black", "marker": "x", "alpha": 0.3, "linewidths": 1, "zorder": 1}
     elif isinstance(agent, radioactivityAgent):
-        # Background radioactivity, distinct light colors and smaller markers
-        color_map = {0: "#ccffcc", 1: "#ffffcc", 2: "#ffcccc"}
-        return {"size": 15, "color": color_map.get(agent.zone, "grey"), "marker": "x"}
+        # We don't need to draw markers for radioactivity anymore since the post_process 
+        # draws the continuous zones. We can return size 0 to hide them.
+        # But we need to make really sure they are invisible, color clear as well
+        return {"size": 0, "alpha": 0.0, "color": "none"}
     
-    return {"size": 10, "color": "grey"}
+    return {"size": 0, "alpha": 0}
 
 model_params = {
     "N_agents": {
@@ -62,7 +92,7 @@ initial_model = RobotMission(N_agents=10, N_waste=10, z=10, height=10)
 
 page = SolaraViz(
     initial_model,
-    components=[make_space_component(agent_portrayal)],
+    components=[make_space_component(agent_portrayal, post_process=draw_zones)],
     model_params=model_params,
     name="Robot Mission"
 )
