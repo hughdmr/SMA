@@ -1,7 +1,6 @@
 #2 16/03/2026 Hugues d'Hardemare Louis Vauterin
 
 from mesa import Agent
-from model import RobotMission
 
 class wasteAgent(Agent):
     """This agent will represent the object waste, and will have an
@@ -10,6 +9,15 @@ attribute allowing to distinguish between green, yellow and red waste."""
         super().__init__(model)
         self.zone = zone
         self.waste_type = model.random.choice(["green", "yellow", "red"])
+        self.is_collected = False
+        self.is_transformed = False
+
+    def collect(self):
+        self.is_collected = True
+
+    def transform(self):
+        if self.is_collected:
+            self.is_transformed = True
     
 class radioactivityAgent(Agent):
     """This agent will have no behavior but two attributes: the
@@ -35,3 +43,6 @@ cell as being the waste disposal zone)."""
         super().__init__(model)
         self.zone = zone
         self.radioactivity_level = -1  # A distinct value to identify waste disposal zones
+
+    def accepts(self, waste):
+        return waste.is_transformed
