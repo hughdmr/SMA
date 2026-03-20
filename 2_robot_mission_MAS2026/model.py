@@ -45,13 +45,7 @@ class RobotMission(Model):
     
     def step(self):
         """Advance the model by one step."""
-        self.agents.shuffle_do("step_agent")
-
-    def _build_percepts(self, pos):
-        percepts = {}
-        for neighbor in self.grid.get_neighborhood(pos, moore=True, include_center=False):
-            percepts[neighbor] = self.grid.get_cell_list_contents([neighbor])
-        return percepts
+        self.agents.shuffle_do("step")
 
     def do(self, agent, action):
         """the “do” allows the agent to inform the environment of its actions (the results of
@@ -86,7 +80,7 @@ then perform the changes entailed by the action."""
                 return {"error": "Move out of bounds", "percepts": self._build_percepts(agent.pos)}
 
             self.grid.move_agent(agent, new_pos)
-            return self._build_percepts(agent.pos)
+            return agent.build_percepts(agent.pos)
 
         if action == "pick_up":
             if getattr(agent, "carrying_waste", False):
@@ -102,7 +96,7 @@ then perform the changes entailed by the action."""
             self.grid.remove_agent(waste)
             agent.carrying_waste = True
             agent.carried_waste = waste
-            return self._build_percepts(agent.pos)
+            return agent.build_percepts(agent.pos)
 
         if action == "transform":
             waste = getattr(agent, "carried_waste", None)
