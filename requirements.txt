@@ -1,4 +1,4 @@
-Mesa==3.5.1
+Mesa==3.5.0
 numpy
 pandas
 scipy

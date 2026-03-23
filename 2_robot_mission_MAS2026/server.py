@@ -48,16 +48,14 @@ def agent_portrayal(agent):
     elif isinstance(agent, redAgent):
         return {"size": 400, "color": "red", "marker": "o"}
     elif isinstance(agent, wasteAgent):
-        # Distinct waste colors by zone: dark green, dark goldenrod, and dark red
         waste_colors = {"green": "darkgreen", "yellow": "darkgoldenrod", "red": "darkred"}
-        return {"size": 200, "color": waste_colors.get(agent.waste_type, "black"), "marker": "s", "zorder": 0}
+        return {"size": 200, "color": waste_colors.get(agent.waste_type, "black"), "marker": "s"}
     elif isinstance(agent, wasteDisposalAgent):
         return {"size": 1200, "color": "black", "marker": "x", "alpha": 0.3, "linewidths": 1}
     elif isinstance(agent, radioactivityAgent):
-        # We don't need to draw markers for radioactivity anymore since the post_process 
-        # draws the continuous zones. We can return size 0 to hide them.
-        # But we need to make really sure they are invisible, color clear as well
         return {"size": 0, "alpha": 0.0, "color": "none"}
+    
+    # TO DO highlight last column of each zone 
     
     return {"size": 0, "alpha": 0}
 

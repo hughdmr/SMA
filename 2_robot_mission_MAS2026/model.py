@@ -93,21 +93,16 @@ then perform the changes entailed by the action."""
             self.grid.move_agent(agent, new_pos)
             return self.build_percepts(agent.pos)
 
-        # if action == "pick_up":
-        #     if getattr(agent, "carrying_waste", False):
-        #         return {"error": "Agent already carrying waste", "percepts": self.build_percepts(agent.pos)}
-
-        #     cell_objects = self.grid.get_cell_list_contents([agent.pos])
-        #     wastes = [obj for obj in cell_objects if isinstance(obj, wasteAgent)]
-        #     if not wastes:
-        #         return {"error": "No waste to pick up", "percepts": self.build_percepts(agent.pos)}
-
-        #     waste = wastes[0]
-        #     waste.collect()
-        #     self.grid.remove_agent(waste)
-        #     agent.carrying_waste = True
-        #     agent.carried_waste = waste
-        #     return self.build_percepts(agent.pos)
+        if action == "pick_up":
+            cell_objects = self.grid.get_cell_list_contents([agent.pos])
+            wastes_of_color = [obj for obj in cell_objects if isinstance(obj, wasteAgent) and obj.waste_type == agent.color]
+            if not wastes_of_color:
+                return {"error": "No waste to pick up", "percepts": self.build_percepts(agent.pos)}
+            waste_to_pick_up = wastes_of_color[0]
+            waste_to_pick_up.collect()
+            self.grid.remove_agent(waste_to_pick_up) # TO DO ADD ICON VIZ FOR WASTE PICKUP
+            agent.knowledge["waste_on_board"] = waste_to_pick_up
+            return self.build_percepts(agent.pos)
 
         # if action == "transform":
         #     waste = getattr(agent, "carried_waste", None)

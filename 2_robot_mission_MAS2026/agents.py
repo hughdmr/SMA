@@ -9,8 +9,6 @@ class robotAgent(Agent):
     def __init__(self, model, zone):
         super().__init__(model)
         self.zone = zone
-        # self.carrying_waste = False
-        # self.carried_waste = None
         self.last_percepts = None
         """The attribute self.knowledge should represent the beliefs and knowledge of the
 agent. The representation of these is entirely up to you! (as a bare minimum, you
@@ -20,9 +18,9 @@ might consider storing the percepts and actions at each time step)."""
             "target": None,
             "action_history": [],
             "percept_history": [],
-            # "waste_here": False,
+            "waste_here": False,
             "on_disposal": False,
-            # "carrying_waste": False,
+            "waste_on_board": None,
             # "waste_transformed": False,
             "zone_start_x": 0,
             "zone_end_x": 0,
@@ -41,10 +39,9 @@ might consider storing the percepts and actions at each time step)."""
         knowledge["zone_start_x"] = 0
         knowledge["zone_end_x"] = zone_end_x
         knowledge["grid_height"] = self.model.grid.height
-        # knowledge["carrying_waste"] = self.carrying_waste
 
         current_cell = self.model.grid.get_cell_list_contents([self.pos])
-        # knowledge["waste_here"] = any(isinstance(obj, wasteAgent) for obj in current_cell)
+        knowledge["waste_here"] = any(isinstance(obj, wasteAgent) for obj in current_cell)
         # knowledge["on_disposal"] = any(isinstance(obj, wasteDisposalAgent) for obj in current_cell)
 
         # definition d'une prochaine target parmi les cases voisines contenant des déchets
@@ -52,7 +49,7 @@ might consider storing the percepts and actions at each time step)."""
         neighbors = []
         if isinstance(percepts, dict):
             for cell_pos, objects in percepts.items():
-                if cell_pos[0] < 0 or cell_pos[0] > zone_end_x and cell_pos[1] < 0 or cell_pos[1] >= self.model.grid.height:
+                if cell_pos[0] < 0 or cell_pos[0] > zone_end_x or cell_pos[1] < 0 or cell_pos[1] >= self.model.grid.height:
                     continue  # ignore les cases en dehors de la zone de l'agent
                 if any(isinstance(obj, wasteAgent) for obj in objects):
                     neighbors_with_waste.append(cell_pos)
@@ -60,8 +57,6 @@ might consider storing the percepts and actions at each time step)."""
 
         print(f"Agent {self.unique_id} percepts neighbors: {percepts}")
         print(f"neighbors_with_waste: of {self.pos}", neighbors_with_waste)
-
-        # knowledge["target"] = random.choice(neighbors)
 
         if neighbors_with_waste:
             print(f"Agent {self.unique_id} sees waste at: {neighbors_with_waste}")
@@ -84,16 +79,23 @@ such as move to an adjacent tile, pick up, transform, put down, … Its
 implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
         x, y = knowledge["current_position"]
 
-        # if knowledge["carrying_waste"]: # Déchet porté --> transformation ou dépôt
-        #     if not knowledge["waste_transformed"]:
-        #         return "transform"
-        #     if knowledge["on_disposal"]:
-        #         return "drop"
-        #     target = (knowledge["zone_end_x"], y)
-        # else: # Pas de déchet porté --> collecte ou déplacement vers un déchet
+        if self.color == "green":
+            if knowledge["waste_on_board"]:
+                if knowledge["waste_on_board"].waste_type == "green" : # Déchet porté de la bonne couleur --> cher
+                    if knowledge["waste_here"]:
+                        return "transform"
+                else : # Déchet déjà transformé
+                    knowledge["target"] = (knowledge["zone_end_x"], y)
+                    if x < knowledge["zone_end_x"]:
+                        return "move_right"
+            else :
+                if knowledge["waste_here"]:
+                    return "pick_up" # TO DO VIZ
+        
+        # TO DO yellow and red
 
-        # if knowledge["waste_here"]:
-        #         return "pick_up"
+        # TO DO transform
+            
         target = knowledge["target"]
         if target is None:
             # aucun target, on fait un mouvement aléatoire pour explorer la zone
@@ -129,11 +131,14 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
 class greenAgent(robotAgent):
     def __init__(self, model):
         super().__init__(model, zone=0)
+        self.color = "green"
 
 class yellowAgent(robotAgent):
     def __init__(self, model):
         super().__init__(model, zone=1)
+        self.color = "yellow"
 
 class redAgent(robotAgent):
     def __init__(self, model):
         super().__init__(model, zone=2) 
+        self.color = "red"
