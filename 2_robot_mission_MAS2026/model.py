@@ -50,6 +50,7 @@ class RobotMission(Model):
         neighbors = self.grid.get_neighborhood(pos, moore=False, include_center=False)
         # remove diagonals from neighbors
         neighbors = [n for n in neighbors if n[0] == pos[0] or n[1] == pos[1]]
+        print(f"Neighbors of {pos}: {neighbors}")
         for neighbor in neighbors:
             percepts[neighbor] = self.grid.get_cell_list_contents([neighbor])
         return percepts
@@ -104,13 +105,16 @@ then perform the changes entailed by the action."""
             agent.knowledge["waste_on_board"] = waste_to_pick_up
             return self.build_percepts(agent.pos)
 
-        # if action == "transform":
-        #     waste = getattr(agent, "carried_waste", None)
-        #     if not getattr(agent, "carrying_waste", False) or waste is None:
-        #         return {"error": "No carried waste to transform", "percepts": self.build_percepts(agent.pos)}
-
-        #     waste.transform()
-        #     return self.build_percepts(agent.pos)
+        if action == "transform":
+            cell_objects = self.grid.get_cell_list_contents([agent.pos])
+            wastes_of_color = [obj for obj in cell_objects if isinstance(obj, wasteAgent) and obj.waste_type == agent.color]
+            waste_to_transform = wastes_of_color[0] if wastes_of_color else None
+            self.grid.remove_agent(waste_to_transform)  # remove the waste from the grid to update its position for visualization
+            # TO DO add a step pick up before transorm
+            agent.knowledge["waste_on_board"] = wasteAgent(self, agent.zone + 1)
+            # TO DO CHANGE VIZ OF CARRIED WASTE
+            agent.target = (agent.model.grid.width - 1, agent.pos[1])  # set target to waste disposal zone
+            return self.build_percepts(agent.pos)
 
         # if action == "drop":
         #     waste = getattr(agent, "carried_waste", None)
