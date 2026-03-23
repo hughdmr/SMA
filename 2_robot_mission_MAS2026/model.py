@@ -37,11 +37,12 @@ class RobotMission(Model):
                 waste = wasteAgent(self, i)
                 self.grid.place_agent(waste, (x, y))
         
-        #place waste disposal zones as last column of each zone
-        for i in range(self.number_zones):
-            for y in range(self.grid.height):
-                waste_disposal = wasteDisposalAgent(self, i)
-                self.grid.place_agent(waste_disposal, ((i+1)*z-1, y))
+        #place waste disposal zone in a cell in the easternmost part of the grid, randomly among the eastern cells
+        x = 3*z - 1
+        y = self.random.randrange(self.grid.height)
+        waste_disposal = wasteDisposalAgent(self, self.number_zones - 1)
+        self.grid.place_agent(waste_disposal, (x, y))
+        
     
     def build_percepts(self, pos):
         percepts = {}
