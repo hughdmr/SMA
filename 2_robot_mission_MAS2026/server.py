@@ -49,8 +49,8 @@ def agent_portrayal(agent):
         return {"size": 400, "color": "red", "marker": "o"}
     elif isinstance(agent, wasteAgent):
         # Distinct waste colors by zone: dark green, dark goldenrod, and dark red
-        waste_colors = {0: "darkgreen", 1: "darkgoldenrod", 2: "darkred"}
-        return {"size": 200, "color": waste_colors.get(agent.zone, "black"), "marker": "s"}
+        waste_colors = {"green": "darkgreen", "yellow": "darkgoldenrod", "red": "darkred"}
+        return {"size": 200, "color": waste_colors.get(agent.waste_type, "black"), "marker": "s", "zorder": 0}
     elif isinstance(agent, wasteDisposalAgent):
         return {"size": 1200, "color": "black", "marker": "x", "alpha": 0.3, "linewidths": 1}
     elif isinstance(agent, radioactivityAgent):

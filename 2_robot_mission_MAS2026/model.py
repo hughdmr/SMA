@@ -18,11 +18,11 @@ class RobotMission(Model):
         for i in range(self.number_zones):
             for _ in range(N_agents):
                 agent = agent_classes[i](self)
-                # print(f"Creating {agent} for zone {i}")
                 x = self.random.randrange(i*z, (i+1)*z)
                 y = self.random.randrange(self.grid.height)
                 self.grid.place_agent(agent, (x, y))
-                # print(f"Placed {agent.__class__.__name__} in zone {i} at position {(x, y)}")
+                print(f"Placed {agent.__class__.__name__} in zone {i} at position {(x, y)}")
+        
         #place radioactivity according to the zones
         for i in range(self.number_zones):
             for x in range(i*z, (i+1)*z):
@@ -37,12 +37,13 @@ class RobotMission(Model):
                 y2 = self.random.randrange(self.grid.height)
                 waste = wasteAgent(self, i)
                 self.grid.place_agent(waste, (x2, y2))
-                # print(f"Placed waste agent in zone {i} at position {(x2, y2)}")
-        #place waste disposal zones as last column of each zone
-        for i in range(self.number_zones):
-            for y in range(self.grid.height):
-                waste_disposal = wasteDisposalAgent(self, i)
-                self.grid.place_agent(waste_disposal, ((i+1)*z-1, y))
+                print(f"Placed waste agent in zone {i} at position {(x2, y2)}")
+
+        #place waste disposal zone in a cell in the easternmost part of the grid, randomly among the eastern cells
+        x = 3*z - 1
+        y = self.random.randrange(self.grid.height)
+        waste_disposal = wasteDisposalAgent(self, self.number_zones - 1)
+        self.grid.place_agent(waste_disposal, (x, y))
     
     def build_percepts(self, pos): # on veut le voisin du dessus, dessous, gauche, droite
         percepts = {}
