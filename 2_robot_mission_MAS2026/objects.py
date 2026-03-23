@@ -8,7 +8,7 @@ attribute allowing to distinguish between green, yellow and red waste."""
     def __init__(self, model, zone):
         super().__init__(model)
         self.zone = zone
-        self.waste_type = model.random.choice(["green", "yellow", "red"])
+        self.waste_type = ["green", "yellow", "red"][zone]
         self.is_collected = False
         self.is_transformed = False
 
@@ -17,6 +17,10 @@ attribute allowing to distinguish between green, yellow and red waste."""
 
     def transform(self):
         if self.is_collected:
+            if self.waste_type == "green":
+                self.waste_type = "yellow"
+            elif self.waste_type == "yellow":
+                self.waste_type = "red"
             self.is_transformed = True
     
 class radioactivityAgent(Agent):
@@ -43,6 +47,3 @@ cell as being the waste disposal zone)."""
         super().__init__(model)
         self.zone = zone
         self.radioactivity_level = -1  # A distinct value to identify waste disposal zones
-
-    def accepts(self, waste):
-        return waste.is_transformed
