@@ -15,9 +15,9 @@ def draw_zones(ax):
     z = width / 3
     
     # Add colored rectangle patches with lower zorder so they sit behind agents
-    rect_green = patches.Rectangle((x_min, y_min), z, y_max - y_min, facecolor='green', alpha=0.2, zorder=0)
-    rect_yellow = patches.Rectangle((x_min + z, y_min), z, y_max - y_min, facecolor='yellow', alpha=0.2, zorder=0)
-    rect_red = patches.Rectangle((x_min + 2 * z, y_min), z, y_max - y_min, facecolor='red', alpha=0.2, zorder=0)
+    rect_green = patches.Rectangle((x_min, y_min), z, y_max - y_min, facecolor='green', alpha=0.2, zorder=-1)
+    rect_yellow = patches.Rectangle((x_min + z, y_min), z, y_max - y_min, facecolor='yellow', alpha=0.2, zorder=-1)
+    rect_red = patches.Rectangle((x_min + 2 * z, y_min), z, y_max - y_min, facecolor='red', alpha=0.2, zorder=-1)
     
     ax.add_patch(rect_green)
     ax.add_patch(rect_yellow)
@@ -42,17 +42,17 @@ def draw_zones(ax):
 
 def agent_portrayal(agent):
     if isinstance(agent, greenAgent):
-        return {"size": 400, "color": "green", "marker": "o", "zorder": 2}
+        return {"size": 400, "color": "green", "marker": "o"}
     elif isinstance(agent, yellowAgent):
-        return {"size": 400, "color": "orange", "marker": "o", "zorder": 2} # orange is easier to see than yellow on light backgrounds
+        return {"size": 400, "color": "orange", "marker": "o"}
     elif isinstance(agent, redAgent):
-        return {"size": 400, "color": "red", "marker": "o", "zorder": 2}
+        return {"size": 400, "color": "red", "marker": "o"}
     elif isinstance(agent, wasteAgent):
         # Distinct waste colors by zone: dark green, dark goldenrod, and dark red
         waste_colors = {0: "darkgreen", 1: "darkgoldenrod", 2: "darkred"}
-        return {"size": 200, "color": waste_colors.get(agent.zone, "black"), "marker": "s", "zorder": 1}
+        return {"size": 200, "color": waste_colors.get(agent.zone, "black"), "marker": "s"}
     elif isinstance(agent, wasteDisposalAgent):
-        return {"size": 1200, "color": "black", "marker": "x", "alpha": 0.3, "linewidths": 1, "zorder": 1}
+        return {"size": 1200, "color": "black", "marker": "x", "alpha": 0.3, "linewidths": 1}
     elif isinstance(agent, radioactivityAgent):
         # We don't need to draw markers for radioactivity anymore since the post_process 
         # draws the continuous zones. We can return size 0 to hide them.
@@ -96,7 +96,7 @@ model_params = {
     },
 }
 
-initial_model = RobotMission(N_agents=10, N_waste=10, z=10, height=10)
+initial_model = RobotMission(N_agents=2, N_waste=1, z=10, height=10)
 
 page = SolaraViz(
     initial_model,

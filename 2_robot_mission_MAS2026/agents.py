@@ -1,5 +1,6 @@
 #2 16/03/2026 Hugues d'Hardemare Louis Vauterin
 
+import random
 from mesa import Agent
 
 from objects import wasteAgent, wasteDisposalAgent
@@ -8,8 +9,8 @@ class robotAgent(Agent):
     def __init__(self, model, zone):
         super().__init__(model)
         self.zone = zone
-        self.carrying_waste = False
-        self.carried_waste = None
+        # self.carrying_waste = False
+        # self.carried_waste = None
         self.last_percepts = None
         """The attribute self.knowledge should represent the beliefs and knowledge of the
 agent. The representation of these is entirely up to you! (as a bare minimum, you
@@ -19,51 +20,57 @@ might consider storing the percepts and actions at each time step)."""
             "target": None,
             "action_history": [],
             "percept_history": [],
-            "waste_here": False,
+            # "waste_here": False,
             "on_disposal": False,
-            "carrying_waste": False,
-            "waste_transformed": False,
+            # "carrying_waste": False,
+            # "waste_transformed": False,
             "zone_start_x": 0,
             "zone_end_x": 0,
             "grid_height": 0,
         }
-        self.action_list = ["move_up", "move_down", "move_left", "move_right", "pick_up", "transform", "drop"]
+        self.action_list = ["move_up", "move_down", "move_left", "move_right", "pick_up"] #"transform", "drop"]
 
     def update(self, knowledge, percepts):
         if percepts is None:
             percepts = {}
 
         zone_width = self.model.grid.width // self.model.number_zones
-        zone_start_x = self.zone * zone_width
         zone_end_x = (self.zone + 1) * zone_width - 1
 
         knowledge["current_position"] = self.pos
-        knowledge["zone_start_x"] = zone_start_x
+        knowledge["zone_start_x"] = 0
         knowledge["zone_end_x"] = zone_end_x
         knowledge["grid_height"] = self.model.grid.height
-        knowledge["carrying_waste"] = self.carrying_waste
-        knowledge["waste_transformed"] = bool(self.carried_waste and self.carried_waste.is_transformed)
+        # knowledge["carrying_waste"] = self.carrying_waste
 
         current_cell = self.model.grid.get_cell_list_contents([self.pos])
-        knowledge["waste_here"] = any(isinstance(obj, wasteAgent) for obj in current_cell)
-        knowledge["on_disposal"] = any(isinstance(obj, wasteDisposalAgent) for obj in current_cell)
+        # knowledge["waste_here"] = any(isinstance(obj, wasteAgent) for obj in current_cell)
+        # knowledge["on_disposal"] = any(isinstance(obj, wasteDisposalAgent) for obj in current_cell)
 
-        # definition d'une prochaine target parmi les cases voisines contenant des déchets, ou None si aucune n'en contient
+        # definition d'une prochaine target parmi les cases voisines contenant des déchets
         neighbors_with_waste = []
+        neighbors = []
         if isinstance(percepts, dict):
             for cell_pos, objects in percepts.items():
+                if cell_pos[0] < 0 or cell_pos[0] > zone_end_x and cell_pos[1] < 0 or cell_pos[1] >= self.model.grid.height:
+                    continue  # ignore les cases en dehors de la zone de l'agent
                 if any(isinstance(obj, wasteAgent) for obj in objects):
                     neighbors_with_waste.append(cell_pos)
+                neighbors.append(cell_pos)  # on ajoute toutes les cases voisines à la liste des neighbors pour pouvoir choisir une target aléatoire parmi elles si aucune ne contient de déchet
+
+        print(f"Agent {self.unique_id} percepts neighbors: {percepts}")
+        print(f"neighbors_with_waste: of {self.pos}", neighbors_with_waste)
+
+        # knowledge["target"] = random.choice(neighbors)
 
         if neighbors_with_waste:
-            cx, cy = self.pos
-            knowledge["target"] = min(
-                neighbors_with_waste,
-                key=lambda p: abs(p[0] - cx) + abs(p[1] - cy),
-            )
-        elif knowledge["target"] is not None and knowledge["target"] == self.pos:
-            knowledge["target"] = None
-
+            print(f"Agent {self.unique_id} sees waste at: {neighbors_with_waste}")
+            knowledge["target"] = random.choice(neighbors_with_waste)  # target la première case avec du déchet trouvée
+        else:
+            knowledge["target"] = random.choice(neighbors)
+        
+        # else: # sinon, on se fixe comme target la zone de dépot
+        #     knowledge["target"] = (zone_end_x, self.pos[1])
         knowledge["percept_history"].append(percepts)
 
     def deliberate(self, knowledge):
@@ -77,16 +84,17 @@ such as move to an adjacent tile, pick up, transform, put down, … Its
 implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
         x, y = knowledge["current_position"]
 
-        if knowledge["carrying_waste"]: # Déchet porté --> transformation ou dépôt
-            if not knowledge["waste_transformed"]:
-                return "transform"
-            if knowledge["on_disposal"]:
-                return "drop"
-            target = (knowledge["zone_end_x"], y)
-        else: # Pas de déchet porté --> collecte ou déplacement vers un déchet
-            if knowledge["waste_here"]:
-                return "pick_up"
-            target = knowledge["target"]
+        # if knowledge["carrying_waste"]: # Déchet porté --> transformation ou dépôt
+        #     if not knowledge["waste_transformed"]:
+        #         return "transform"
+        #     if knowledge["on_disposal"]:
+        #         return "drop"
+        #     target = (knowledge["zone_end_x"], y)
+        # else: # Pas de déchet porté --> collecte ou déplacement vers un déchet
+
+        # if knowledge["waste_here"]:
+        #         return "pick_up"
+        target = knowledge["target"]
         if target is None:
             # aucun target, on fait un mouvement aléatoire pour explorer la zone
             return self.random.choice(["move_up", "move_down", "move_left", "move_right"])
@@ -109,7 +117,9 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
             percepts = self.model.build_percepts(self.pos)
 
         self.update(self.knowledge, percepts)
+        print(f"Agent {self.unique_id} at {self.pos} with target {self.knowledge['target']}")
         action = self.deliberate(self.knowledge)
+        print(f"Agent {self.unique_id} decided to: {action}")
         self.knowledge["action_history"].append(action)
         self.last_percepts = self.model.do(self, action)
 
