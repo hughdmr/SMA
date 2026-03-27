@@ -43,7 +43,6 @@ cells. The implementation of this zone can be done either by programming a new
 object agent (without behavior) or by using a radioactivated agent with a
 particular radioactivity value (this value will allow the robot agents to identify this
 cell as being the waste disposal zone)."""
-    def __init__(self, model, zone):
+    def __init__(self, model):
         super().__init__(model)
-        self.zone = zone
         self.radioactivity_level = -1  # A distinct value to identify waste disposal zones

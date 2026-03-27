@@ -80,30 +80,55 @@ argument. The variable action describes the action chosen by the agent, among a 
 such as move to an adjacent tile, pick up, transform, put down, … Its
 implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
         x, y = knowledge["current_position"]
+        colors = ["green", "yellow", "red"]
 
-        if self.color == "green":
+        # for color in colors:
+        #     if self.color == color:
+        if self.color == "red":
             if knowledge["waste_on_board"]:
-                if knowledge["waste_on_board"].waste_type == "green" : # Déchet porté de la bonne couleur --> cher
-                    if knowledge["waste_here"]:
-                        return "transform"
-                else : # Déchet déjà transformé
-                    knowledge["target"] = (knowledge["zone_end_x"], y)
-                    if x < knowledge["zone_end_x"]:
+                # Recherche manuelle de la position du wasteDisposalAgent
+                disposal_pos = None
+                for cell_content, (x_cell, y_cell) in self.model.grid.coord_iter():
+                    for obj in cell_content:
+                        if isinstance(obj, wasteDisposalAgent) and getattr(obj, "radioactivity_level", None) == -1:
+                            disposal_pos = (x_cell, y_cell)
+                            break
+                    if disposal_pos is not None:
+                        break
+                knowledge["target"] = disposal_pos
+                print(f"Agent {self.unique_id} is red and has waste on board, setting target to waste disposal zone at {knowledge['target']}")
+                if knowledge["target"] is not None:
+                    if x < knowledge["target"][0]:
                         return "move_right"
-            else :
+                    if y < knowledge["target"][1]:
+                        return "move_up"
+                    else:
+                        return "drop" # TO DO
+            else:
+                if knowledge["waste_here"]:
+                    return "pick_up" # TO DO VIZ
+        else:
+            if knowledge["waste_on_board"]:
+                if knowledge["waste_on_board"].waste_type == self.color : # Déchet pas encore transformé car de la même couleur
+                    if knowledge["waste_here"] : # Déchet à transformer de la bonne couleur (car dans la zone) sur la case
+                        return "transform" # transformation supposée immédiate
+                else : # Déchet déjà transformé donc à déposer dans la colonne de dépôt
+                    if self.color == "red" : # Déchet déjà transformé une fois, il faut le déposer
+                        knowledge["target"] = (knowledge["zone_end_x"], y)
+                    # if x < knowledge["zone_end_x"]:
+                    #     return "move_right"
+            else : 
                 if knowledge["waste_here"]:
                     return "pick_up" # TO DO VIZ
         
-        # TO DO yellow and red
-
-        # TO DO transform
+        # TO DO transform (actuellement immédiat pour simplifier)
+        # et donc TO DO drop (actuellement immédiat pour simplifier)
             
         target = knowledge["target"]
-        if target is None:
-            # aucun target, on fait un mouvement aléatoire pour explorer la zone
+        if target is None: # aucun target, on fait un mouvement aléatoire pour explorer la zone
             return self.random.choice(["move_up", "move_down", "move_left", "move_right"])
+        
         tx, ty = target
-
         # Définition des mouvements pour se rapprocher de la target
         if tx > x and x < knowledge["zone_end_x"]:
             return "move_right"
@@ -118,7 +143,7 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
     
     def step_agent(self, percepts=None):
         if percepts is None:
-            percepts = self.model.build_percepts(self.pos)
+            percepts = self.model.build_percepts(self)
 
         self.update(self.knowledge, percepts)
         print(f"Agent {self.unique_id} at {self.pos} with target {self.knowledge['target']}")

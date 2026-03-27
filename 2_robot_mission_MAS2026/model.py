@@ -21,7 +21,6 @@ class RobotMission(Model):
                 x = self.random.randrange(i*z, (i+1)*z)
                 y = self.random.randrange(self.grid.height)
                 self.grid.place_agent(agent, (x, y))
-                print(f"Placed {agent.__class__.__name__} in zone {i} at position {(x, y)}")
         
         #place radioactivity according to the zones
         for i in range(self.number_zones):
@@ -37,20 +36,21 @@ class RobotMission(Model):
                 y2 = self.random.randrange(self.grid.height)
                 waste = wasteAgent(self, i)
                 self.grid.place_agent(waste, (x2, y2))
-                print(f"Placed waste agent in zone {i} at position {(x2, y2)}")
 
         #place waste disposal zone in a cell in the easternmost part of the grid, randomly among the eastern cells
         x = 3*z - 1
         y = self.random.randrange(self.grid.height)
-        waste_disposal = wasteDisposalAgent(self, self.number_zones - 1)
+        waste_disposal = wasteDisposalAgent(self)
+        waste_disposal.pos = (x, y)  # set the position attribute for visualization purposes
+        print(f"Placing waste disposal agent at ({x}, {y})")
         self.grid.place_agent(waste_disposal, (x, y))
     
-    def build_percepts(self, pos): # on veut le voisin du dessus, dessous, gauche, droite
+    def build_percepts(self, agent): # on veut le voisin du dessus, dessous, gauche, droite
         percepts = {}
-        neighbors = self.grid.get_neighborhood(pos, moore=False, include_center=False)
+        neighbors = self.grid.get_neighborhood(agent.pos, moore=False, include_center=False)
         # remove diagonals from neighbors
-        neighbors = [n for n in neighbors if n[0] == pos[0] or n[1] == pos[1]]
-        print(f"Neighbors of {pos}: {neighbors}")
+        neighbors = [n for n in neighbors if n[0] == agent.pos[0] or n[1] == agent.pos[1]]
+        print(f"Neighbors of {agent.unique_id} at {agent.pos}: {neighbors}")
         for neighbor in neighbors:
             percepts[neighbor] = self.grid.get_cell_list_contents([neighbor])
         return percepts
@@ -89,32 +89,37 @@ then perform the changes entailed by the action."""
                 new_pos = (x + 1, y)
 
             if self.grid.out_of_bounds(new_pos):
-                return {"error": "Move out of bounds", "percepts": self.build_percepts(agent.pos)}
+                return {"error": "Move out of bounds", "percepts": self.build_percepts(agent)}
 
             self.grid.move_agent(agent, new_pos)
-            return self.build_percepts(agent.pos)
+            return self.build_percepts(agent)
 
         if action == "pick_up":
             cell_objects = self.grid.get_cell_list_contents([agent.pos])
             wastes_of_color = [obj for obj in cell_objects if isinstance(obj, wasteAgent) and obj.waste_type == agent.color]
             if not wastes_of_color:
-                return {"error": "No waste to pick up", "percepts": self.build_percepts(agent.pos)}
+                print(f"Agent {agent.unique_id} attempted to pick up waste at {agent.pos} but found none of the right color.")
+                return {"error": "No waste to pick up", "percepts": self.build_percepts(agent)}
             waste_to_pick_up = wastes_of_color[0]
             waste_to_pick_up.collect()
             self.grid.remove_agent(waste_to_pick_up) # TO DO ADD ICON VIZ FOR WASTE PICKUP
             agent.knowledge["waste_on_board"] = waste_to_pick_up
-            return self.build_percepts(agent.pos)
+            return self.build_percepts(agent)
 
         if action == "transform":
             cell_objects = self.grid.get_cell_list_contents([agent.pos])
             wastes_of_color = [obj for obj in cell_objects if isinstance(obj, wasteAgent) and obj.waste_type == agent.color]
-            waste_to_transform = wastes_of_color[0] if wastes_of_color else None
+            if not wastes_of_color:
+                print(f"Agent {agent.unique_id} attempted to transform waste at {agent.pos} but found none of the right color.")
+                print(f"Cell objects: {cell_objects}")
+                return {"error": "No waste to transform", "percepts": self.build_percepts(agent)}
+            waste_to_transform = wastes_of_color[0]
             self.grid.remove_agent(waste_to_transform)  # remove the waste from the grid to update its position for visualization
-            # TO DO add a step pick up before transorm
-            agent.knowledge["waste_on_board"] = wasteAgent(self, agent.zone + 1)
+            # TO DO add a step pick up before transform
+            agent.knowledge["waste_on_board"] = wasteAgent(self, agent.zone)
             # TO DO CHANGE VIZ OF CARRIED WASTE
             agent.target = (agent.model.grid.width - 1, agent.pos[1])  # set target to waste disposal zone
-            return self.build_percepts(agent.pos)
+            return self.build_percepts(agent)
 
         # if action == "drop":
         #     waste = getattr(agent, "carried_waste", None)
@@ -134,5 +139,5 @@ then perform the changes entailed by the action."""
         #     agent.carried_waste = None
         #     return self.build_percepts(agent.pos)
 
-        return {"error": "Unknown action", "percepts": self.build_percepts(agent.pos)}
+        return {"error": "Unknown action", "percepts": self.build_percepts(agent)}
     
