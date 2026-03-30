@@ -14,34 +14,37 @@ class robotAgent(Agent):
 agent. The representation of these is entirely up to you! (as a bare minimum, you
 might consider storing the percepts and actions at each time step)."""
         self.knowledge = {
-            "current_position": None,
+            "current_position": self.pos,
             "target": None,
             "action_history": [],
             "percept_history": [],
             "waste_here": False,
             "on_disposal": False,
             "waste_on_board": None,
+            "waste_here": None,
             # "waste_transformed": False,
             "zone_start_x": 0,
-            "zone_end_x": 0,
-            "grid_height": 0,
+            "grid_height": self.model.grid.height,
         }
         self.action_list = ["move_up", "move_down", "move_left", "move_right", "pick_up"] #"transform", "drop"]
 
     def update(self, knowledge, percepts):
         if percepts is None:
             percepts = {}
+        knowledge["current_position"] = self.pos
 
+         # definition de la zone de l'agent
         zone_width = self.model.grid.width // self.model.number_zones
         zone_end_x = (self.zone + 1) * zone_width - 1
-
-        knowledge["current_position"] = self.pos
-        knowledge["zone_start_x"] = 0
         knowledge["zone_end_x"] = zone_end_x
-        knowledge["grid_height"] = self.model.grid.height
 
+        # looking for waste on the current cell
+        knowledge["waste_here"] = None  # réinitialiser avant de chercher
         current_cell = self.model.grid.get_cell_list_contents([self.pos])
-        knowledge["waste_here"] = any(isinstance(obj, wasteAgent) for obj in current_cell)
+        for obj in current_cell:
+            if isinstance(obj, wasteAgent):
+                knowledge["waste_here"] = obj
+                break
         # knowledge["on_disposal"] = any(isinstance(obj, wasteDisposalAgent) for obj in current_cell)
 
         # definition d'une prochaine target parmi les cases voisines contenant des déchets
@@ -82,9 +85,9 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
         x, y = knowledge["current_position"]
         colors = ["green", "yellow", "red"]
 
-        # for color in colors:
-        #     if self.color == color:
+        ## ROUGE : D'abord on implémente le comportement du robot rouge
         if self.color == "red":
+            # Si il a déjà un déchet, on le dirige vers la zone de dépôt et on drop dès qu'on y est
             if knowledge["waste_on_board"]:
                 # Recherche manuelle de la position du wasteDisposalAgent
                 disposal_pos = None
@@ -103,31 +106,36 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
                     if y < knowledge["target"][1]:
                         return "move_up"
                     else:
-                        return "drop" # TO DO
-            else:
-                if knowledge["waste_here"]:
+                        return "drop" # TO DO in model
+            else: # si il n'a pas de déchet, soit il en pick up un
+                if knowledge["waste_here"] and knowledge["waste_here"].waste_type == "red":
                     return "pick_up" # TO DO VIZ
+            # dernière option, il se déplace pour explorer la zone (cf fin)
+        ## VERT ET JAUNE : comportement similaire
         else:
             if knowledge["waste_on_board"]:
                 if knowledge["waste_on_board"].waste_type == self.color : # Déchet pas encore transformé car de la même couleur
-                    if knowledge["waste_here"] : # Déchet à transformer de la bonne couleur (car dans la zone) sur la case
+                    if knowledge["waste_here"] and knowledge["waste_here"].waste_type == self.color: # Déchet à transformer de la bonne couleur sur la case
                         return "transform" # transformation supposée immédiate
                 else : # Déchet déjà transformé donc à déposer dans la colonne de dépôt
-                    if self.color == "red" : # Déchet déjà transformé une fois, il faut le déposer
-                        knowledge["target"] = (knowledge["zone_end_x"], y)
-                    # if x < knowledge["zone_end_x"]:
-                    #     return "move_right"
-            else : 
-                if knowledge["waste_here"]:
+                    knowledge["target"] = (knowledge["zone_end_x"], y)
+                    if x < knowledge["target"][0]:
+                        return "move_right"
+                    else:
+                        return "drop"
+            else: 
+                if knowledge["waste_here"] and knowledge["waste_here"].waste_type == self.color: # Déchet de la bonne couleur à ramasser
                     return "pick_up" # TO DO VIZ
+                # dernière option, il se déplace pour explorer la zone (cf fin)
         
-        # TO DO transform (actuellement immédiat pour simplifier)
+        # TO DO transform en 2 étapes (actuellement immédiat pour simplifier)
         # et donc TO DO drop (actuellement immédiat pour simplifier)
-            
+        # TO DO : clean le code (pick up)
+        
+        ## DERNIERE OPTION POUR TOUS LES ROBOTS : EXPLORER LA ZONE
         target = knowledge["target"]
         if target is None: # aucun target, on fait un mouvement aléatoire pour explorer la zone
             return self.random.choice(["move_up", "move_down", "move_left", "move_right"])
-        
         tx, ty = target
         # Définition des mouvements pour se rapprocher de la target
         if tx > x and x < knowledge["zone_end_x"]:
@@ -138,7 +146,6 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
             return "move_up"
         if ty < y and y > 0:
             return "move_down"
-
         return "move_left" if x > knowledge["zone_start_x"] else "move_right"
     
     def step_agent(self, percepts=None):

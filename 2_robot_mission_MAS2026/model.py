@@ -12,6 +12,7 @@ class RobotMission(Model):
         self.grid = MultiGrid(3*z, height, torus=False)
         self.number_zones = 3
         self.zone_radioactivity = {"1": (0,0.33), "2": (0.33,0.66), "3": (0.66,1)}
+        self.count_collected_red_waste = 0
 
         #place agents in their respective zones
         agent_classes = [greenAgent, yellowAgent, redAgent]
@@ -101,7 +102,7 @@ then perform the changes entailed by the action."""
                 print(f"Agent {agent.unique_id} attempted to pick up waste at {agent.pos} but found none of the right color.")
                 return {"error": "No waste to pick up", "percepts": self.build_percepts(agent)}
             waste_to_pick_up = wastes_of_color[0]
-            waste_to_pick_up.collect()
+            # waste_to_pick_up.collect()
             self.grid.remove_agent(waste_to_pick_up) # TO DO ADD ICON VIZ FOR WASTE PICKUP
             agent.knowledge["waste_on_board"] = waste_to_pick_up
             return self.build_percepts(agent)
@@ -114,30 +115,28 @@ then perform the changes entailed by the action."""
                 print(f"Cell objects: {cell_objects}")
                 return {"error": "No waste to transform", "percepts": self.build_percepts(agent)}
             waste_to_transform = wastes_of_color[0]
-            self.grid.remove_agent(waste_to_transform)  # remove the waste from the grid to update its position for visualization
-            # TO DO add a step pick up before transform
-            agent.knowledge["waste_on_board"] = wasteAgent(self, agent.zone)
-            # TO DO CHANGE VIZ OF CARRIED WASTE
-            agent.target = (agent.model.grid.width - 1, agent.pos[1])  # set target to waste disposal zone
+            self.grid.remove_agent(waste_to_transform)
+            # Crée un déchet de la couleur suivante (zone + 1)
+            new_waste = wasteAgent(self, agent.zone + 1)
+            agent.knowledge["waste_on_board"] = new_waste
+            print(f"Agent {agent.unique_id} transformed waste to {new_waste.waste_type}")
             return self.build_percepts(agent)
 
-        # if action == "drop":
-        #     waste = getattr(agent, "carried_waste", None)
-        #     if not getattr(agent, "carrying_waste", False) or waste is None:
-        #         return {"error": "No carried waste to drop", "percepts": self.build_percepts(agent.pos)}
-
-        #     cell_objects = self.grid.get_cell_list_contents([agent.pos])
-        #     disposals = [obj for obj in cell_objects if isinstance(obj, wasteDisposalAgent)]
-        #     if not disposals:
-        #         return {"error": "Not on a disposal cell", "percepts": self.build_percepts(agent.pos)}
-
-        #     disposal = disposals[0]
-        #     if not disposal.accepts(waste):
-        #         return {"error": "Waste must be transformed before drop", "percepts": self.build_percepts(agent.pos)}
-
-        #     agent.carrying_waste = False
-        #     agent.carried_waste = None
-        #     return self.build_percepts(agent.pos)
+        if action == "drop":
+            waste = agent.knowledge.get("waste_on_board", None)
+            if waste is None:
+                return {"error": "No carried waste to drop", "percepts": self.build_percepts(agent)}
+            if agent.color != "red":
+                # Placer le déchet dans la zone suivante (x+1) pour que le robot suivant puisse le ramasser
+                drop_pos = (agent.pos[0] + 1, agent.pos[1])
+                self.grid.place_agent(waste, drop_pos)
+                print(f"Agent {agent.unique_id} dropped waste at {drop_pos} for next zone")
+            else:
+                self.count_collected_red_waste += 1
+                print(f"Agent {agent.unique_id} disposed waste. Total disposed: {self.count_collected_red_waste}")
+            agent.knowledge["waste_on_board"] = None
+            agent.target = None
+            return self.build_percepts(agent)
 
         return {"error": "Unknown action", "percepts": self.build_percepts(agent)}
     

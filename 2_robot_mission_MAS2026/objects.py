@@ -12,16 +12,16 @@ attribute allowing to distinguish between green, yellow and red waste."""
         self.is_collected = False
         self.is_transformed = False
 
-    def collect(self):
-        self.is_collected = True
+    # def collect(self):
+    #     self.is_collected = True
 
-    def transform(self):
-        if self.is_collected:
-            if self.waste_type == "green":
-                self.waste_type = "yellow"
-            elif self.waste_type == "yellow":
-                self.waste_type = "red"
-            self.is_transformed = True
+    # def transform(self):
+    #     if self.is_collected:
+    #         if self.waste_type == "green":
+    #             self.waste_type = "yellow"
+    #         elif self.waste_type == "yellow":
+    #             self.waste_type = "red"
+    #         self.is_transformed = True
     
 class radioactivityAgent(Agent):
     """This agent will have no behavior but two attributes: the
