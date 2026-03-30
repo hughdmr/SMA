@@ -2,11 +2,17 @@
 from mesa import agent
 from mesa.visualization import SolaraViz, make_space_component 
 from model import RobotMission
-from agents import greenAgent, yellowAgent, redAgent
+from agents import robotAgent, greenAgent, yellowAgent, redAgent
 from objects import wasteAgent, radioactivityAgent, wasteDisposalAgent
 import matplotlib.patches as patches
 
+
+DISPOSAL_POS = None
+DISPOSAL_COUNT = 0
+
 def draw_zones(ax):
+    global DISPOSAL_POS, DISPOSAL_COUNT
+
     # This post-process function draws uniform continuous background zones 
     # over the entire grid
     x_min, x_max = ax.get_xlim()
@@ -40,22 +46,53 @@ def draw_zones(ax):
     # Put a title on it to make it look nicer
     ax.set_title("Robot Waste Cleanup", fontsize=14, pad=10)
 
+    # Simple disposal counter displayed on top of the disposal square.
+    if DISPOSAL_POS is not None:
+        ax.text(
+            DISPOSAL_POS[0],
+            DISPOSAL_POS[1],
+            str(DISPOSAL_COUNT),
+            ha="center",
+            va="center",
+            fontsize=10,
+            color="black",
+            fontweight="bold",
+            zorder=6,
+        )
+
 def agent_portrayal(agent):
-    if isinstance(agent, greenAgent):
-        return {"size": 400, "color": "green", "marker": "o"}
-    elif isinstance(agent, yellowAgent):
-        return {"size": 400, "color": "orange", "marker": "o"}
-    elif isinstance(agent, redAgent):
-        return {"size": 400, "color": "red", "marker": "o"}
+    global DISPOSAL_POS, DISPOSAL_COUNT
+
+    waste_colors = {"green": "darkgreen", "yellow": "darkgoldenrod", "red": "darkred"}
+    marker = "o"
+    if isinstance(agent, robotAgent):
+        if agent.knowledge.get("waste_on_board") is not None:
+            if agent.knowledge.get("waste_on_board").waste_type == agent.color:
+                marker = "$⊙$"
+            else:
+                marker = "$⚇$"
+
+        if isinstance(agent, greenAgent):
+            return {"size": 400, "color": "green", "marker": marker}
+        elif isinstance(agent, yellowAgent):
+            return {"size": 400, "color": "orange", "marker": marker}
+        elif isinstance(agent, redAgent):
+            return {"size": 400, "color": "red", "marker": marker}
     elif isinstance(agent, wasteAgent):
-        waste_colors = {"green": "darkgreen", "yellow": "darkgoldenrod", "red": "darkred"}
+        # Distinct waste colors by zone: dark green, dark goldenrod, and dark red
         return {"size": 200, "color": waste_colors.get(agent.waste_type, "black"), "marker": "s"}
     elif isinstance(agent, wasteDisposalAgent):
-        return {"size": 1200, "color": "black", "marker": "x", "alpha": 0.3, "linewidths": 1}
+        DISPOSAL_POS = agent.pos
+        DISPOSAL_COUNT = agent.model.count_collected_red_waste
+        return {
+            "size": 620,
+            "color": "lightgray",
+            "marker": "s",
+            "alpha": 1.0,
+            "zorder": 1,
+        }
     elif isinstance(agent, radioactivityAgent):
         return {"size": 0, "alpha": 0.0, "color": "none"}
-    
-    # TO DO highlight last column of each zone 
     
     return {"size": 0, "alpha": 0}
 
@@ -94,7 +131,7 @@ model_params = {
     },
 }
 
-initial_model = RobotMission(N_agents=2, N_waste=1, z=10, height=10)
+initial_model = RobotMission(N_agents=10, N_waste=10, z=10, height=10)
 
 page = SolaraViz(
     initial_model,
@@ -102,4 +139,3 @@ page = SolaraViz(
     model_params=model_params,
     name="Robot Mission"
 )
-
