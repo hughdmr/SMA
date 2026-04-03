@@ -18,13 +18,11 @@ might consider storing the percepts and actions at each time step)."""
             "target": None,
             "action_history": [],
             "percept_history": [],
-            "waste_here": False,
+            "waste_here": None,
             "on_disposal": False,
             "waste_on_board": None,
-            "waste_here": None,
-            # "waste_transformed": False,
-            "zone_start_x": 0,
-            "grid_height": self.model.grid.height,
+            "zone_start_x": self.zone * self.model.grid.width // self.model.number_zones - 1,
+            "zone_end_x": (self.zone + 1) * self.model.grid.width // self.model.number_zones -1,
             "peer_same_color_with_waste_nearby": False,
             "peer_same_color_min_id": None,
         }
@@ -34,11 +32,6 @@ might consider storing the percepts and actions at each time step)."""
         if percepts is None:
             percepts = {}
         knowledge["current_position"] = self.pos
-
-         # definition de la zone de l'agent
-        zone_width = self.model.grid.width // self.model.number_zones
-        zone_end_x = (self.zone + 1) * zone_width - 1
-        knowledge["zone_end_x"] = zone_end_x
 
         # looking for waste on the current cell
         knowledge["waste_here"] = None  # réinitialiser avant de chercher
@@ -57,7 +50,7 @@ might consider storing the percepts and actions at each time step)."""
             for cell_pos, objects in percepts.items():
                 # print(percepts)
                 # print(f"Checking neighbor {cell_pos} with objects {objects}")
-                if cell_pos[0] < 0 or cell_pos[0] > zone_end_x or cell_pos[1] < 0 or cell_pos[1] >= self.model.grid.height:
+                if cell_pos[0] < 0 or cell_pos[0] > knowledge["zone_end_x"] or cell_pos[1] < 0 or cell_pos[1] >= self.model.grid.height:
                     continue  # ignore les cases en dehors de la zone de l'agent
                 #on s'assure que les dechets sont de la bonne couleur
                 if any(
@@ -176,7 +169,7 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
             return "move_right"
         if tx < x and x > knowledge["zone_start_x"]:
             return "move_left"
-        if ty > y and y < knowledge["grid_height"] - 1:
+        if ty > y and y < self.model.grid.height - 1:
             return "move_up"
         if ty < y and y > 0:
             return "move_down"

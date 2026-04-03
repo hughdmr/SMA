@@ -1,0 +1,13 @@
+{"v1" : {
+    "communication" : "false",
+    "target_when_None" : "random",
+    "action_history" : 0,
+    "neighborhood_perception" : 4,
+    "init_params": {
+        "N_agents": 10,
+        "N_waste": 30,
+        "number_zones": 3,
+        "grid_width": 15,
+        "grid_height": 15
+    }
+}}
