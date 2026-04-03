@@ -56,7 +56,10 @@ might consider storing the percepts and actions at each time step)."""
                 print(f"Checking neighbor {cell_pos} with objects {objects}")
                 if cell_pos[0] < 0 or cell_pos[0] > zone_end_x or cell_pos[1] < 0 or cell_pos[1] >= self.model.grid.height:
                     continue  # ignore les cases en dehors de la zone de l'agent
-                if any(isinstance(obj, wasteAgent) for obj in objects):
+                if any(
+                    isinstance(obj, wasteAgent) and obj.waste_type == self.color
+                    for obj in objects
+                ):
                     neighbors_with_waste.append(cell_pos)
                 neighbors.append(cell_pos)  # on ajoute toutes les cases voisines à la liste des neighbors pour pouvoir choisir une target aléatoire parmi elles si aucune ne contient de déchet
 
