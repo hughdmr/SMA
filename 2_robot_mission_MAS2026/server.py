@@ -171,7 +171,9 @@ def waste_bar_chart_component(model):
             "Jaune": int(last_row["waste_yellow"]),
             "Rouge": int(last_row["waste_red"]),
             "Depose": int(last_row["waste_disposed"]),
+            
         }
+        
 
     labels = list(counts.keys())
     values = list(counts.values())
@@ -179,6 +181,8 @@ def waste_bar_chart_component(model):
 
     bars = ax.bar(labels, values, color=colors)
     ax.set_title("Etat des dechets")
+    n_waste = model_params["N_waste"]["value"]
+    ax.set_xlabel(f"Verif : Déposés = (Vi-Vf)/2 + (Ji-Jf)/2 + (Ri-Rf), \n on a bien {counts["Depose"]} = ({n_waste}-{counts['Vert']})/2 + ({n_waste}-{counts['Jaune']})/2 + ({n_waste}-{counts['Rouge']})/2")
     ax.set_ylabel("Nombre")
     ax.set_ylim(0, max(values + [1]) + 1)
 
