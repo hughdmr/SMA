@@ -55,8 +55,8 @@ might consider storing the percepts and actions at each time step)."""
         peer_same_color_min_id = None
         if isinstance(percepts, dict):
             for cell_pos, objects in percepts.items():
-                print(percepts)
-                print(f"Checking neighbor {cell_pos} with objects {objects}")
+                # print(percepts)
+                # print(f"Checking neighbor {cell_pos} with objects {objects}")
                 if cell_pos[0] < 0 or cell_pos[0] > zone_end_x or cell_pos[1] < 0 or cell_pos[1] >= self.model.grid.height:
                     continue  # ignore les cases en dehors de la zone de l'agent
                 #on s'assure que les dechets sont de la bonne couleur
@@ -89,7 +89,7 @@ might consider storing the percepts and actions at each time step)."""
         print(f"neighbors_with_waste: of {self.pos}", neighbors_with_waste)
 
         if neighbors_with_waste:
-            print(f"Agent {self.unique_id} sees waste at: {neighbors_with_waste}")
+            # print(f"Agent {self.unique_id} sees waste at: {neighbors_with_waste}")
             knowledge["target"] = random.choice(neighbors_with_waste)  # target la première case avec du déchet trouvée
         else:
             knowledge["target"] = random.choice(neighbors)
@@ -163,11 +163,14 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
         # et donc TO DO drop (actuellement immédiat pour simplifier)
         # TO DO : clean le code (pick up)
         
-        ## DERNIERE OPTION POUR TOUS LES ROBOTS : EXPLORER LA ZONE
-        target = knowledge["target"]
-        if target is None: # aucun target, on fait un mouvement aléatoire pour explorer la zone
+        ## DERNIERE OPTION POUR TOUS LES ROBOTS : EXPLORER LA ZONE OU ALLER VERS LA COLONNE DE DEPOT DE LA ZONE PRECEDENTE
+        # Pour les robots impairs rouges et jaunes, la target par défaut est la colonne de dépôt de la zone précédente, pour les pairs verts, c'est une case aléatoire de la zone
+        if self.unique_id % 2 == 1 and self.color in ["yellow", "red"]:
+            print(f"Agent {self.unique_id} is {'yellow' if self.color == 'yellow' else 'red'} and has no waste on board, setting target to previous zone's disposal column at {knowledge['target']}")
+            knowledge["target"] = (knowledge["zone_end_x"] - self.model.grid.width // self.model.number_zones, y)
+        if knowledge["target"] is None: # aucun target, on fait un mouvement aléatoire pour explorer la zone
             return self.random.choice(["move_up", "move_down", "move_left", "move_right"])
-        tx, ty = target
+        tx, ty = knowledge["target"]
         # Définition des mouvements pour se rapprocher de la target
         if tx > x and x < knowledge["zone_end_x"]:
             return "move_right"

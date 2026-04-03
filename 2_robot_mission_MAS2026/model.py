@@ -24,6 +24,7 @@ class RobotMission(Model):
                 x = self.random.randrange(i*z, (i+1)*z)
                 y = self.random.randrange(self.grid.height)
                 self.grid.place_agent(agent, (x, y))
+                print(f"Placing {agent.__class__.__name__} with id {agent.unique_id} at ({x}, {y}) in zone {i+1}")
         
         #place radioactivity according to the zones
         for i in range(self.number_zones):
@@ -45,7 +46,7 @@ class RobotMission(Model):
         y = self.random.randrange(self.grid.height)
         waste_disposal = wasteDisposalAgent(self)
         waste_disposal.pos = (x, y)  # set the position attribute for visualization purposes
-        print(f"Placing waste disposal agent at ({x}, {y})")
+        # print(f"Placing waste disposal agent at ({x}, {y})")
         self.grid.place_agent(waste_disposal, (x, y))
 
         self.datacollector = DataCollector(
@@ -66,7 +67,7 @@ class RobotMission(Model):
         neighbors = self.grid.get_neighborhood(agent.pos, moore=False, include_center=False)
         # remove diagonals from neighbors
         neighbors = [n for n in neighbors if n[0] == agent.pos[0] or n[1] == agent.pos[1]]
-        print(f"Neighbors of {agent.unique_id} at {agent.pos}: {neighbors}")
+        # print(f"Neighbors of {agent.unique_id} at {agent.pos}: {neighbors}")
         for neighbor in neighbors:
             percepts[neighbor] = self.grid.get_cell_list_contents([neighbor])
         return percepts
@@ -115,7 +116,7 @@ then perform the changes entailed by the action."""
             cell_objects = self.grid.get_cell_list_contents([agent.pos])
             wastes_of_color = [obj for obj in cell_objects if isinstance(obj, wasteAgent) and obj.waste_type == agent.color]
             if not wastes_of_color:
-                print(f"Agent {agent.unique_id} attempted to pick up waste at {agent.pos} but found none of the right color.")
+                # print(f"Agent {agent.unique_id} attempted to pick up waste at {agent.pos} but found none of the right color.")
                 return {"error": "No waste to pick up", "percepts": self.build_percepts(agent)}
             waste_to_pick_up = wastes_of_color[0]
             # waste_to_pick_up.collect()
@@ -131,8 +132,8 @@ then perform the changes entailed by the action."""
             cell_objects = self.grid.get_cell_list_contents([agent.pos])
             wastes_of_color = [obj for obj in cell_objects if isinstance(obj, wasteAgent) and obj.waste_type == agent.color]
             if not wastes_of_color:
-                print(f"Agent {agent.unique_id} attempted to transform waste at {agent.pos} but found none of the right color.")
-                print(f"Cell objects: {cell_objects}")
+                # print(f"Agent {agent.unique_id} attempted to transform waste at {agent.pos} but found none of the right color.")
+                # print(f"Cell objects: {cell_objects}")
                 return {"error": "No waste to transform", "percepts": self.build_percepts(agent)}
             waste_to_transform = wastes_of_color[0]
             self.grid.remove_agent(waste_to_transform)
@@ -152,7 +153,7 @@ then perform the changes entailed by the action."""
                 # Placer le déchet à la fin de la zone pour que le robot suivant puisse le ramasser
                 drop_pos = (agent.pos[0], agent.pos[1])
                 self.grid.place_agent(waste, drop_pos)
-                print(f"Agent {agent.unique_id} dropped waste at {drop_pos} for next zone")
+                # print(f"Agent {agent.unique_id} dropped waste at {drop_pos} for next zone")
             else:
                 self.count_collected_red_waste += 1
                 self.waste_counts["red"] -= 1
