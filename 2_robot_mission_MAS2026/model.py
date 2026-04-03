@@ -127,8 +127,8 @@ then perform the changes entailed by the action."""
             if waste is None:
                 return {"error": "No carried waste to drop", "percepts": self.build_percepts(agent)}
             if agent.color != "red":
-                # Placer le déchet dans la zone suivante (x+1) pour que le robot suivant puisse le ramasser
-                drop_pos = (agent.pos[0] + 1, agent.pos[1])
+                # Placer le déchet à la fin de la zone pour que le robot suivant puisse le ramasser
+                drop_pos = (agent.pos[0], agent.pos[1])
                 self.grid.place_agent(waste, drop_pos)
                 print(f"Agent {agent.unique_id} dropped waste at {drop_pos} for next zone")
             else:
