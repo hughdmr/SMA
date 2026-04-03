@@ -1,6 +1,7 @@
 #2 16/03/2026 Hugues d'Hardemare Louis Vauterin
 
 from mesa import Model
+from mesa.datacollection import DataCollector
 from mesa.space import MultiGrid
 from agents import greenAgent, yellowAgent, redAgent
 from objects import wasteAgent, radioactivityAgent, wasteDisposalAgent
@@ -13,6 +14,7 @@ class RobotMission(Model):
         self.number_zones = 3
         self.zone_radioactivity = {"1": (0,0.33), "2": (0.33,0.66), "3": (0.66,1)}
         self.count_collected_red_waste = 0
+        self.waste_counts = {"green": N_waste, "yellow": N_waste, "red": N_waste}
 
         #place agents in their respective zones
         agent_classes = [greenAgent, yellowAgent, redAgent]
@@ -45,6 +47,19 @@ class RobotMission(Model):
         waste_disposal.pos = (x, y)  # set the position attribute for visualization purposes
         print(f"Placing waste disposal agent at ({x}, {y})")
         self.grid.place_agent(waste_disposal, (x, y))
+
+        self.datacollector = DataCollector(
+            model_reporters={
+                "waste_green": lambda m: m.count_waste_by_type("green"),
+                "waste_yellow": lambda m: m.count_waste_by_type("yellow"),
+                "waste_red": lambda m: m.count_waste_by_type("red"),
+                "waste_disposed": lambda m: m.count_collected_red_waste,
+            }
+        )
+        self.datacollector.collect(self)
+
+    def count_waste_by_type(self, waste_type):
+        return self.waste_counts.get(waste_type, 0)
     
     def build_percepts(self, agent): # on veut le voisin du dessus, dessous, gauche, droite
         percepts = {}
@@ -59,6 +74,7 @@ class RobotMission(Model):
     def step(self):
         """Advance the model by one step."""
         self.agents.shuffle_do("step")
+        self.datacollector.collect(self)
 
     def do(self, agent, action):
         """the “do” allows the agent to inform the environment of its actions (the results of
@@ -108,6 +124,10 @@ then perform the changes entailed by the action."""
             return self.build_percepts(agent)
 
         if action == "transform":
+            carried_waste = agent.knowledge.get("waste_on_board")
+            if carried_waste is None or carried_waste.waste_type != agent.color:
+                return {"error": "No carried waste to transform", "percepts": self.build_percepts(agent)}
+
             cell_objects = self.grid.get_cell_list_contents([agent.pos])
             wastes_of_color = [obj for obj in cell_objects if isinstance(obj, wasteAgent) and obj.waste_type == agent.color]
             if not wastes_of_color:
@@ -119,6 +139,8 @@ then perform the changes entailed by the action."""
             # Crée un déchet de la couleur suivante (zone + 1)
             new_waste = wasteAgent(self, agent.zone + 1)
             agent.knowledge["waste_on_board"] = new_waste
+            self.waste_counts[agent.color] -= 2
+            self.waste_counts[new_waste.waste_type] += 1
             print(f"Agent {agent.unique_id} transformed waste to {new_waste.waste_type}")
             return self.build_percepts(agent)
 
@@ -133,6 +155,7 @@ then perform the changes entailed by the action."""
                 print(f"Agent {agent.unique_id} dropped waste at {drop_pos} for next zone")
             else:
                 self.count_collected_red_waste += 1
+                self.waste_counts["red"] -= 1
                 print(f"Agent {agent.unique_id} disposed waste. Total disposed: {self.count_collected_red_waste}")
             agent.knowledge["waste_on_board"] = None
             agent.target = None
