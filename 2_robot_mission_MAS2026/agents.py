@@ -25,6 +25,8 @@ might consider storing the percepts and actions at each time step)."""
             # "waste_transformed": False,
             "zone_start_x": 0,
             "grid_height": self.model.grid.height,
+            "peer_same_color_with_waste_nearby": False,
+            "peer_same_color_min_id": None,
         }
         self.action_list = ["move_up", "move_down", "move_left", "move_right", "pick_up"] #"transform", "drop"]
 
@@ -50,18 +52,38 @@ might consider storing the percepts and actions at each time step)."""
         # definition d'une prochaine target parmi les cases voisines contenant des déchets
         neighbors_with_waste = []
         neighbors = []
+        peer_same_color_min_id = None
         if isinstance(percepts, dict):
             for cell_pos, objects in percepts.items():
                 print(percepts)
                 print(f"Checking neighbor {cell_pos} with objects {objects}")
                 if cell_pos[0] < 0 or cell_pos[0] > zone_end_x or cell_pos[1] < 0 or cell_pos[1] >= self.model.grid.height:
                     continue  # ignore les cases en dehors de la zone de l'agent
+                #on s'assure que les dechets sont de la bonne couleur
                 if any(
                     isinstance(obj, wasteAgent) and obj.waste_type == self.color
                     for obj in objects
                 ):
                     neighbors_with_waste.append(cell_pos)
+
+                # Coordination locale: si deux robots de meme couleur portent un dechet,
+                # le robot avec l'ID le plus grand deposera son dechet.
+                for obj in objects:
+                    if (
+                        isinstance(obj, robotAgent)
+                        and obj is not self
+                        and obj.color == self.color
+                        and obj.knowledge.get("waste_on_board") is not None
+                    ):
+                        if peer_same_color_min_id is None:
+                            peer_same_color_min_id = obj.unique_id
+                        else:
+                            peer_same_color_min_id = min(peer_same_color_min_id, obj.unique_id)
+
                 neighbors.append(cell_pos)  # on ajoute toutes les cases voisines à la liste des neighbors pour pouvoir choisir une target aléatoire parmi elles si aucune ne contient de déchet
+
+        knowledge["peer_same_color_with_waste_nearby"] = peer_same_color_min_id is not None
+        knowledge["peer_same_color_min_id"] = peer_same_color_min_id
 
         print(f"Agent {self.unique_id} percepts neighbors: {percepts}")
         print(f"neighbors_with_waste: of {self.pos}", neighbors_with_waste)
@@ -120,6 +142,12 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
                 if knowledge["waste_on_board"].waste_type == self.color : # Déchet pas encore transformé car de la même couleur
                     if knowledge["waste_here"] and knowledge["waste_here"].waste_type == self.color: # Déchet à transformer de la bonne couleur sur la case
                         return "transform" # transformation supposée immédiate
+                    if (
+                        knowledge.get("peer_same_color_with_waste_nearby")
+                        and knowledge.get("peer_same_color_min_id") is not None
+                        and self.unique_id > knowledge["peer_same_color_min_id"]
+                    ):
+                        return "drop"
                 else : # Déchet déjà transformé donc à déposer dans la colonne de dépôt
                     knowledge["target"] = (knowledge["zone_end_x"], y)
                     if x < knowledge["target"][0]:
