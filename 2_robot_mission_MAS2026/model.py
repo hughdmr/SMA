@@ -8,13 +8,25 @@ from objects import wasteAgent, radioactivityAgent, wasteDisposalAgent
 
 class RobotMission(Model):
 
-    def __init__(self, N_agents=10, N_waste=10, z=10, height=10, seed=None):
+    def __init__(self, N_agents=10, want_no_waste_at_end=False, N_waste=10, z=10, height=10, seed=None):
         super().__init__(seed=seed)
+
+        # Si want_no_waste_at_end, arrondir aux multiples appropriés
+        if want_no_waste_at_end:
+            N_waste_green = (N_waste // 4) * 4
+            N_waste_yellow = (N_waste // 2) * 2
+            N_waste_red = N_waste - N_waste_green - N_waste_yellow
+        else:
+            N_waste_green = N_waste
+            N_waste_yellow = N_waste
+            N_waste_red = N_waste
+
         self.grid = MultiGrid(3*z, height, torus=False)
         self.number_zones = 3
         self.zone_radioactivity = {"1": (0,0.33), "2": (0.33,0.66), "3": (0.66,1)}
         self.count_collected_red_waste = 0
-        self.waste_counts = {"green": N_waste, "yellow": N_waste, "red": N_waste}
+        self.waste_counts = {"green": N_waste_green, "yellow": N_waste_yellow, "red": N_waste_red}
+        self.initial_waste_counts = {"green": N_waste_green, "yellow": N_waste_yellow, "red": N_waste_red}
 
         #place agents in their respective zones
         agent_classes = [greenAgent, yellowAgent, redAgent]

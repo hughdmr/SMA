@@ -157,8 +157,8 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
         # TO DO : clean le code (pick up)
         
         ## DERNIERE OPTION POUR TOUS LES ROBOTS : EXPLORER LA ZONE OU ALLER VERS LA COLONNE DE DEPOT DE LA ZONE PRECEDENTE
-        # 1 fois sur 3 je souhaite fixer comme target la colonne de dépôt de la zone précédente pour favoriser la circulation des déchets entre les zones, sinon je choisis une target aléatoire parmi les voisins (déjà fait dans update)
-        if self.color in ["yellow", "red"] and self.knowledge.get("waste_on_board") is None and random.random() < 0.33:
+        # 1 fois sur 3 et pour 1 agent sur 2, je souhaite fixer comme target la colonne de dépôt de la zone précédente pour favoriser la circulation des déchets entre les zones, sinon je choisis une target aléatoire parmi les voisins (déjà fait dans update)
+        if self.unique_id % 2 == 0 and self.color in ["yellow", "red"] and self.knowledge.get("waste_on_board") is None and random.random() < 0.33:
             print(f"Agent {self.unique_id} is {'yellow' if self.color == 'yellow' else 'red'} and has no waste on board, randomly deciding to target previous zone's disposal column at {knowledge['target']}")
             knowledge["target"] = (knowledge["zone_end_x"] - self.model.grid.width // self.model.number_zones, random.randint(0, self.model.grid.height - 1))
         if knowledge["target"] is None: # aucun target, on fait un mouvement aléatoire pour explorer la zone
