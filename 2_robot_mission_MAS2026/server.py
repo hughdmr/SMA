@@ -230,9 +230,44 @@ def robot_movement_heatmap_component(model):
 
     solara.FigureMatplotlib(fig, format="png", bbox_inches="tight")
 
+
+@solara.component
+def communication_metrics_component(model):
+    update_counter.get()
+
+    metrics = getattr(model, "communication_metrics", {})
+    communication_enabled = getattr(model, "communication_enabled", False)
+    advanced_enabled = getattr(model, "advanced_communication_enabled", False)
+
+    with solara.Card("Communication Metrics", style={"width": "100%"}):
+        solara.Markdown(f"- communication: **{communication_enabled}**")
+        solara.Markdown(f"- advanced_communication: **{advanced_enabled}**")
+
+        rows = [
+            ["have_waste_sent", str(metrics.get("have_waste_sent", 0))],
+            ["have_waste_received", str(metrics.get("have_waste_received", 0))],
+            ["need_handoff_sent", str(metrics.get("need_handoff_sent", 0))],
+            ["need_handoff_received", str(metrics.get("need_handoff_received", 0))],
+            ["claim_handoff_sent", str(metrics.get("claim_handoff_sent", 0))],
+            ["claim_handoff_received", str(metrics.get("claim_handoff_received", 0))],
+            ["commit_handoff_sent", str(metrics.get("commit_handoff_sent", 0))],
+            ["commit_handoff_received", str(metrics.get("commit_handoff_received", 0))],
+            ["assist_drops", str(metrics.get("assist_drops", 0))],
+            ["assist_pickups", str(metrics.get("assist_pickups", 0))],
+        ]
+        lines = ["| Metric | Count |", "|---|---:|"]
+        for name, value in rows:
+            lines.append(f"| {name} | {value} |")
+        solara.Markdown("\n".join(lines))
+
 page = SolaraViz(
     initial_model,
-    components=[custom_component, waste_bar_chart_component, robot_movement_heatmap_component],
+    components=[
+        custom_component,
+        waste_bar_chart_component,
+        robot_movement_heatmap_component,
+        communication_metrics_component,
+    ],
     model_params=model_params,
     name="Robot Mission"
 )

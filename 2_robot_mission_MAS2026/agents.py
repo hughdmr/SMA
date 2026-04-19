@@ -32,21 +32,89 @@ might consider storing the percepts and actions at each time step)."""
             "adjacent_carrier_pos": None,
             "rendezvous_target_id": None,
             "rendezvous_target_pos": None,
+            "assist_target_pos": None,
+            "assist_request_id": None,
+            "assist_source": None,
+            "assist_since": None,
+            "pending_handoff_request_id": None,
+            "pending_handoff_candidates": [],
+            "committed_helper_name": None,
+            "committed_helper_since": None,
+            "committed_handoff_pos": None,
+            "last_need_handoff_step": -999999,
+            "last_have_waste_step": -999999,
+            "committed_helper_adjacent": False,
         }
         self.action_list = ["move_up", "move_down", "move_left", "move_right", "pick_up"] #"transform", "drop"]
 
+    def _current_step(self):
+        return getattr(self.model, "steps", 0)
+
+    def _next_zone_start_x(self):
+        zone_width = self.model.grid.width // self.model.number_zones
+        return (self.zone + 1) * zone_width
+
+    def _handoff_position_for_carried(self):
+        carried = self.knowledge.get("waste_on_board")
+        if carried is None:
+            return self.pos
+        if carried.waste_type == "yellow":
+            # Boundary between green and yellow zones.
+            return (self.knowledge["zone_end_x"], self.pos[1])
+        if carried.waste_type == "red":
+            # Boundary between yellow and red zones.
+            return (self.knowledge["zone_end_x"], self.pos[1])
+        return self.pos
+
     def communication_name(self):
         return self.get_name()
+
+    def _is_advanced_communication_enabled(self):
+        return (
+            getattr(self.model, "communication_enabled", False)
+            and getattr(self.model, "advanced_communication_enabled", False)
+        )
+
+    def _inc_comm_metric(self, name, amount=1):
+        if hasattr(self.model, "increment_communication_metric"):
+            self.model.increment_communication_metric(name, amount)
+
+    def _advanced_tuning(self, key, default_value):
+        tuning = getattr(self.model, "advanced_comm_tuning", {})
+        try:
+            return int(tuning.get(key, default_value))
+        except (TypeError, ValueError):
+            return default_value
 
     def process_communication(self):
         if not getattr(self.model, "communication_enabled", False):
             self.knowledge["rendezvous_target_id"] = None
             self.knowledge["rendezvous_target_pos"] = None
+            self.knowledge["assist_target_pos"] = None
+            self.knowledge["assist_request_id"] = None
+            self.knowledge["assist_source"] = None
+            self.knowledge["assist_since"] = None
+            self.knowledge["pending_handoff_request_id"] = None
+            self.knowledge["pending_handoff_candidates"] = []
+            self.knowledge["committed_helper_name"] = None
+            self.knowledge["committed_helper_since"] = None
+            self.knowledge["committed_handoff_pos"] = None
             return
+
+        advanced_enabled = self._is_advanced_communication_enabled()
 
         # Broadcast only if the robot is carrying a waste of its own color.
         carried = self.knowledge.get("waste_on_board")
-        if carried is not None and carried.waste_type == self.color:
+        have_waste_cooldown = self._advanced_tuning("have_waste_cooldown", 4) if advanced_enabled else 0
+        should_send_have_waste = (
+            carried is not None
+            and carried.waste_type == self.color
+            and (
+                have_waste_cooldown == 0
+                or self._current_step() - self.knowledge.get("last_have_waste_step", -999999) >= have_waste_cooldown
+            )
+        )
+        if should_send_have_waste:
             content = {
                 "type": "have_waste",
                 "color": self.color,
@@ -67,6 +135,8 @@ might consider storing the percepts and actions at each time step)."""
                             content,
                         )
                     )
+                    self._inc_comm_metric("have_waste_sent")
+            self.knowledge["last_have_waste_step"] = self._current_step()
 
         messages = self.get_new_messages()
         candidates = []
@@ -76,25 +146,171 @@ might consider storing the percepts and actions at each time step)."""
             payload = msg.get_content()
             if not isinstance(payload, dict):
                 continue
-            if payload.get("type") != "have_waste":
-                continue
-            if payload.get("color") != self.color:
+
+            msg_type = payload.get("type")
+            if msg_type == "have_waste":
+                if payload.get("color") != self.color:
+                    continue
+                sender_id = payload.get("agent_id")
+                sender_pos = payload.get("position")
+                if sender_id is None or sender_pos is None:
+                    continue
+                candidates.append((sender_id, sender_pos))
+                self._inc_comm_metric("have_waste_received")
                 continue
 
-            sender_id = payload.get("agent_id")
-            sender_pos = payload.get("position")
-            if sender_id is None or sender_pos is None:
+            if not advanced_enabled:
                 continue
-            candidates.append((sender_id, sender_pos))
+
+            if msg_type == "need_handoff":
+                if self.knowledge.get("waste_on_board") is not None:
+                    continue
+                if payload.get("target_color") != self.color:
+                    continue
+                self._inc_comm_metric("need_handoff_received")
+                claim_content = {
+                    "type": "claim_handoff",
+                    "request_id": payload.get("request_id"),
+                    "claimer_name": self.communication_name(),
+                    "claimer_id": self.unique_id,
+                    "claimer_pos": self.pos,
+                }
+                self.send_message(
+                    Message(
+                        self.communication_name(),
+                        msg.get_exp(),
+                        MessagePerformative.INFORM_REF,
+                        claim_content,
+                    )
+                )
+                self._inc_comm_metric("claim_handoff_sent")
+
+            elif msg_type == "claim_handoff":
+                request_id = payload.get("request_id")
+                if request_id is None:
+                    continue
+                if request_id != self.knowledge.get("pending_handoff_request_id"):
+                    continue
+                self._inc_comm_metric("claim_handoff_received")
+                current = self.knowledge.get("pending_handoff_candidates", [])
+                current.append(payload)
+                self.knowledge["pending_handoff_candidates"] = current
+
+            elif msg_type == "commit_handoff":
+                self._inc_comm_metric("commit_handoff_received")
+                handoff_pos = payload.get("handoff_pos")
+                if (
+                    isinstance(handoff_pos, tuple)
+                    and len(handoff_pos) == 2
+                    and self.knowledge["zone_start_x"] <= handoff_pos[0] <= self.knowledge["zone_end_x"]
+                ):
+                    self.knowledge["assist_target_pos"] = handoff_pos
+                else:
+                    self.knowledge["assist_target_pos"] = None
+                self.knowledge["assist_request_id"] = payload.get("request_id")
+                self.knowledge["assist_source"] = payload.get("source_name")
+                self.knowledge["assist_since"] = self._current_step()
 
         if not candidates:
             self.knowledge["rendezvous_target_id"] = None
             self.knowledge["rendezvous_target_pos"] = None
+        else:
+            target_id, target_pos = min(candidates, key=lambda item: item[0])
+            self.knowledge["rendezvous_target_id"] = target_id
+            self.knowledge["rendezvous_target_pos"] = target_pos
+
+        if not advanced_enabled:
             return
 
-        target_id, target_pos = min(candidates, key=lambda item: item[0])
-        self.knowledge["rendezvous_target_id"] = target_id
-        self.knowledge["rendezvous_target_pos"] = target_pos
+        commit_timeout_steps = self._advanced_tuning("commit_timeout_steps", 30)
+        if (
+            self.knowledge.get("committed_helper_name") is not None
+            and self.knowledge.get("committed_helper_since") is not None
+            and self._current_step() - self.knowledge["committed_helper_since"] > commit_timeout_steps
+        ):
+            self.knowledge["committed_helper_name"] = None
+            self.knowledge["committed_helper_since"] = None
+            self.knowledge["pending_handoff_candidates"] = []
+
+        carried = self.knowledge.get("waste_on_board")
+        if carried is None:
+            self.knowledge["pending_handoff_request_id"] = None
+            self.knowledge["pending_handoff_candidates"] = []
+            self.knowledge["committed_helper_name"] = None
+            self.knowledge["committed_helper_since"] = None
+            self.knowledge["committed_handoff_pos"] = None
+
+        if (
+            carried is not None
+            and carried.waste_type != self.color
+            and self.color in ["green", "yellow"]
+        ):
+            request_id = f"{self.unique_id}:{id(carried)}"
+            if request_id != self.knowledge.get("pending_handoff_request_id"):
+                self.knowledge["pending_handoff_request_id"] = request_id
+                self.knowledge["pending_handoff_candidates"] = []
+                self.knowledge["committed_helper_name"] = None
+                self.knowledge["committed_helper_since"] = None
+                self.knowledge["committed_handoff_pos"] = None
+            handoff_pos = self._handoff_position_for_carried()
+            need_content = {
+                "type": "need_handoff",
+                "request_id": request_id,
+                "target_color": carried.waste_type,
+                "handoff_pos": handoff_pos,
+                "source_name": self.communication_name(),
+            }
+            need_handoff_cooldown = self._advanced_tuning("need_handoff_cooldown", 6)
+            if self._current_step() - self.knowledge.get("last_need_handoff_step", -999999) >= need_handoff_cooldown:
+                for other in self.model.agents:
+                    if (
+                        isinstance(other, robotAgent)
+                        and other is not self
+                        and other.color == carried.waste_type
+                    ):
+                        self.send_message(
+                            Message(
+                                self.communication_name(),
+                                other.communication_name(),
+                                MessagePerformative.INFORM_REF,
+                                need_content,
+                            )
+                        )
+                        self._inc_comm_metric("need_handoff_sent")
+                self.knowledge["last_need_handoff_step"] = self._current_step()
+
+        request_id = self.knowledge.get("pending_handoff_request_id")
+        candidates = self.knowledge.get("pending_handoff_candidates", [])
+        if request_id and candidates and self.knowledge.get("committed_helper_name") is None:
+            handoff_pos = self._handoff_position_for_carried()
+            best = min(
+                candidates,
+                key=lambda c: (
+                    abs(c.get("claimer_pos", (10**9, 10**9))[0] - handoff_pos[0])
+                    + abs(c.get("claimer_pos", (10**9, 10**9))[1] - handoff_pos[1]),
+                    c.get("claimer_id", 10**9),
+                ),
+            )
+            helper_name = best.get("claimer_name")
+            if helper_name is not None:
+                self.knowledge["committed_helper_name"] = helper_name
+                self.knowledge["committed_helper_since"] = self._current_step()
+                self.knowledge["committed_handoff_pos"] = handoff_pos
+                commit_content = {
+                    "type": "commit_handoff",
+                    "request_id": request_id,
+                    "handoff_pos": handoff_pos,
+                    "source_name": self.communication_name(),
+                }
+                self.send_message(
+                    Message(
+                        self.communication_name(),
+                        helper_name,
+                        MessagePerformative.INFORM_REF,
+                        commit_content,
+                    )
+                )
+                self._inc_comm_metric("commit_handoff_sent")
 
     def update(self, knowledge, percepts):
         if percepts is None:
@@ -116,6 +332,7 @@ might consider storing the percepts and actions at each time step)."""
         peer_same_color_min_id = None
         adjacent_carrier_id = None
         adjacent_carrier_pos = None
+        committed_helper_adjacent = False
         if isinstance(percepts, dict):
             for cell_pos, objects in percepts.items():
                 # print(percepts)
@@ -147,12 +364,20 @@ might consider storing the percepts and actions at each time step)."""
                         else:
                             peer_same_color_min_id = min(peer_same_color_min_id, obj.unique_id)
 
+                    if (
+                        isinstance(obj, robotAgent)
+                        and self.knowledge.get("committed_helper_name") is not None
+                        and obj.communication_name() == self.knowledge["committed_helper_name"]
+                    ):
+                        committed_helper_adjacent = True
+
                 neighbors.append(cell_pos)  # on ajoute toutes les cases voisines à la liste des neighbors pour pouvoir choisir une target aléatoire parmi elles si aucune ne contient de déchet
 
         knowledge["peer_same_color_with_waste_nearby"] = peer_same_color_min_id is not None
         knowledge["peer_same_color_min_id"] = peer_same_color_min_id
         knowledge["adjacent_carrier_id"] = adjacent_carrier_id
         knowledge["adjacent_carrier_pos"] = adjacent_carrier_pos
+        knowledge["committed_helper_adjacent"] = committed_helper_adjacent
 
         print(f"Agent {self.unique_id} percepts neighbors: {percepts}")
         print(f"neighbors_with_waste: of {self.pos}", neighbors_with_waste)
@@ -179,9 +404,76 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
         x, y = knowledge["current_position"]
         colors = ["green", "yellow", "red"]
 
+        if (
+            self._is_advanced_communication_enabled()
+            and knowledge.get("assist_target_pos") is not None
+            and knowledge.get("waste_on_board") is None
+        ):
+            assist_timeout_steps = self._advanced_tuning("assist_timeout_steps", 45)
+            assist_since = knowledge.get("assist_since")
+            if assist_since is not None and self._current_step() - assist_since > assist_timeout_steps:
+                knowledge["assist_target_pos"] = None
+                knowledge["assist_request_id"] = None
+                knowledge["assist_source"] = None
+                knowledge["assist_since"] = None
+            else:
+                tx, ty = knowledge["assist_target_pos"]
+                if knowledge.get("waste_here") and knowledge["waste_here"].waste_type == self.color:
+                    knowledge["assist_target_pos"] = None
+                    knowledge["assist_request_id"] = None
+                    knowledge["assist_source"] = None
+                    knowledge["assist_since"] = None
+                    self._inc_comm_metric("assist_pickups")
+                    return "pick_up"
+                if tx > x and x < knowledge["zone_end_x"]:
+                    return "move_right"
+                if tx < x and x > knowledge["zone_start_x"]:
+                    return "move_left"
+                if ty > y and y < self.model.grid.height - 1:
+                    return "move_up"
+                if ty < y and y > 0:
+                    return "move_down"
+
+        if (
+            self._is_advanced_communication_enabled()
+            and knowledge.get("waste_on_board") is not None
+            and knowledge["waste_on_board"].waste_type != self.color
+            and knowledge.get("committed_helper_adjacent")
+        ):
+            # Drop transformed waste only at the handoff boundary to keep it
+            # reachable by the next-color robots.
+            if x < knowledge["zone_end_x"]:
+                return "move_right"
+            self._inc_comm_metric("assist_drops")
+            knowledge["committed_helper_name"] = None
+            knowledge["committed_helper_since"] = None
+            knowledge["committed_handoff_pos"] = None
+            knowledge["pending_handoff_request_id"] = None
+            knowledge["pending_handoff_candidates"] = []
+            return "drop"
+
+        if (
+            self._is_advanced_communication_enabled()
+            and knowledge.get("waste_on_board") is not None
+            and knowledge["waste_on_board"].waste_type != self.color
+            and knowledge.get("committed_handoff_pos") is not None
+        ):
+            hx, hy = knowledge["committed_handoff_pos"]
+            if hx > x and x < knowledge["zone_end_x"]:
+                return "move_right"
+            if hx < x and x > knowledge["zone_start_x"]:
+                return "move_left"
+            if hy > y and y < self.model.grid.height - 1:
+                return "move_up"
+            if hy < y and y > 0:
+                return "move_down"
+            return "wait"
+
         # Fast local exchange: if two same-color carriers are adjacent,
         # force immediate coordination instead of exploration.
         if (
+            self.model.communication_enabled
+            and
             knowledge.get("waste_on_board") is not None
             and knowledge["waste_on_board"].waste_type == self.color
             and knowledge.get("adjacent_carrier_id") is not None
@@ -199,7 +491,11 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
                 return "move_up"
             if ny < y:
                 return "move_down"
-            if knowledge.get("waste_here") and knowledge["waste_here"].waste_type == self.color:
+            if (
+                self.color != "red"
+                and knowledge.get("waste_here")
+                and knowledge["waste_here"].waste_type == self.color
+            ):
                 return "transform"
             return "wait"
 
@@ -219,7 +515,11 @@ implementation (e.g. as objects, strings, dictionaries, …) is left to you."""
             if x == tx and y == ty:
                 if self.unique_id > target_id:
                     return "drop"
-                if knowledge.get("waste_here") and knowledge["waste_here"].waste_type == self.color:
+                if (
+                    self.color != "red"
+                    and knowledge.get("waste_here")
+                    and knowledge["waste_here"].waste_type == self.color
+                ):
                     return "transform"
                 return "wait"
             if tx > x and x < knowledge["zone_end_x"]:

@@ -12,7 +12,7 @@ from objects import wasteAgent, radioactivityAgent, wasteDisposalAgent
 
 class RobotMission(Model):
 
-    def __init__(self, N_agents=10, want_no_waste_at_end=False, N_waste=10, z=10, height=10, communication_enabled=None, seed=None):
+    def __init__(self, N_agents=10, want_no_waste_at_end=None, N_waste=10, z=10, height=10, communication_enabled=None, advanced_communication_enabled=None, seed=None):
         super().__init__(seed=seed)
 
         config_path = os.path.join(os.path.dirname(__file__), "config.json")
@@ -20,6 +20,13 @@ class RobotMission(Model):
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as config_file:
                 config_data = json.load(config_file)
+
+        if want_no_waste_at_end is None:
+            no_waste_value = config_data.get("want_no_waste_at_end", False)
+            if isinstance(no_waste_value, str):
+                want_no_waste_at_end = no_waste_value.strip().lower() == "true"
+            else:
+                want_no_waste_at_end = bool(no_waste_value)
 
         if communication_enabled is None:
             communication_value = config_data.get("communication", False)
@@ -29,6 +36,25 @@ class RobotMission(Model):
                 communication_enabled = bool(communication_value)
         self.communication_enabled = communication_enabled
 
+        if advanced_communication_enabled is None:
+            advanced_value = config_data.get("advanced_communication", False)
+            if isinstance(advanced_value, str):
+                advanced_communication_enabled = advanced_value.strip().lower() == "true"
+            else:
+                advanced_communication_enabled = bool(advanced_value)
+        self.advanced_communication_enabled = advanced_communication_enabled
+
+        tuning_from_config = config_data.get("advanced_comm_tuning", {})
+        if not isinstance(tuning_from_config, dict):
+            tuning_from_config = {}
+
+        self.advanced_comm_tuning = {
+            "have_waste_cooldown": int(tuning_from_config.get("have_waste_cooldown", 4)),
+            "need_handoff_cooldown": int(tuning_from_config.get("need_handoff_cooldown", 6)),
+            "commit_timeout_steps": int(tuning_from_config.get("commit_timeout_steps", 30)),
+            "assist_timeout_steps": int(tuning_from_config.get("assist_timeout_steps", 45)),
+        }
+
         if MessageService.get_instance() is not None:
             MessageService._MessageService__instance = None
         MessageService(self, instant_delivery=True)
@@ -37,11 +63,13 @@ class RobotMission(Model):
         if want_no_waste_at_end:
             N_waste_green = (N_waste // 4) * 4
             N_waste_yellow = (N_waste // 2) * 2
-            N_waste_red = N_waste - N_waste_green - N_waste_yellow
+            N_waste_red = N_waste
         else:
             N_waste_green = N_waste
             N_waste_yellow = N_waste
             N_waste_red = N_waste
+
+        self.want_no_waste_at_end = want_no_waste_at_end
 
         self.grid = MultiGrid(3*z, height, torus=False)
         self.number_zones = 3
@@ -49,6 +77,18 @@ class RobotMission(Model):
         self.count_collected_red_waste = 0
         self.waste_counts = {"green": N_waste_green, "yellow": N_waste_yellow, "red": N_waste_red}
         self.initial_waste_counts = {"green": N_waste_green, "yellow": N_waste_yellow, "red": N_waste_red}
+        self.communication_metrics = {
+            "have_waste_sent": 0,
+            "have_waste_received": 0,
+            "need_handoff_sent": 0,
+            "need_handoff_received": 0,
+            "claim_handoff_sent": 0,
+            "claim_handoff_received": 0,
+            "commit_handoff_sent": 0,
+            "commit_handoff_received": 0,
+            "assist_pickups": 0,
+            "assist_drops": 0,
+        }
         # Number of visits per cell by robots, indexed as [y][x].
         self.robot_visit_counts = [
             [0 for _ in range(self.grid.width)]
@@ -74,8 +114,9 @@ class RobotMission(Model):
                     self.grid.place_agent(radioactivity, (x, y))
 
         #place waste
+        wastes_per_zone = [N_waste_green, N_waste_yellow, N_waste_red]
         for i in range(self.number_zones):
-            for _ in range(N_waste):
+            for _ in range(wastes_per_zone[i]):
                 x2 = self.random.randrange(i*z, (i+1)*z)
                 y2 = self.random.randrange(self.grid.height)
                 waste = wasteAgent(self, i)
@@ -101,6 +142,25 @@ class RobotMission(Model):
 
     def count_waste_by_type(self, waste_type):
         return self.waste_counts.get(waste_type, 0)
+
+    def increment_communication_metric(self, metric_name, amount=1):
+        if metric_name not in self.communication_metrics:
+            self.communication_metrics[metric_name] = 0
+        self.communication_metrics[metric_name] += amount
+
+    def is_mission_complete(self):
+        return (
+            self.waste_counts.get("green", 0) == 0
+            and self.waste_counts.get("yellow", 0) == 0
+            and self.waste_counts.get("red", 0) == 0
+        )
+
+    def run_until_complete(self, max_steps=2000):
+        for _ in range(max_steps):
+            if self.is_mission_complete():
+                return self.steps
+            self.step()
+        return None
     
     def build_percepts(self, agent): # on veut le voisin du dessus, dessous, gauche, droite
         percepts = {}
@@ -169,6 +229,9 @@ then perform the changes entailed by the action."""
             return self.build_percepts(agent)
 
         if action == "transform":
+            if agent.zone >= self.number_zones - 1:
+                return {"error": "Cannot transform in final zone", "percepts": self.build_percepts(agent)}
+
             carried_waste = agent.knowledge.get("waste_on_board")
             if carried_waste is None or carried_waste.waste_type != agent.color:
                 return {"error": "No carried waste to transform", "percepts": self.build_percepts(agent)}

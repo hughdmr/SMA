@@ -1,6 +1,13 @@
 {
     "want_no_waste_at_end" : "false",
     "communication" : "true",
+    "advanced_communication" : "true",
+    "advanced_comm_tuning": {
+        "have_waste_cooldown": 4,
+        "need_handoff_cooldown": 6,
+        "commit_timeout_steps": 30,
+        "assist_timeout_steps": 45
+    },
     "target_when_None" : "random",
     "action_history" : 0,
     "neighborhood_perception" : 4,
