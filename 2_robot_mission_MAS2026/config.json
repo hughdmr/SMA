@@ -1,6 +1,6 @@
 {
     "want_no_waste_at_end" : "false",
-    "communication" : "false",
+    "communication" : "true",
     "target_when_None" : "random",
     "action_history" : 0,
     "neighborhood_perception" : 4,

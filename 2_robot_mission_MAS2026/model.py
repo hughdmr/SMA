@@ -1,15 +1,37 @@
 #2 16/03/2026 Hugues d'Hardemare Louis Vauterin
 
+import json
+import os
+
 from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.space import MultiGrid
 from agents import greenAgent, yellowAgent, redAgent
+from communication.message.MessageService import MessageService
 from objects import wasteAgent, radioactivityAgent, wasteDisposalAgent
 
 class RobotMission(Model):
 
-    def __init__(self, N_agents=10, want_no_waste_at_end=False, N_waste=10, z=10, height=10, seed=None):
+    def __init__(self, N_agents=10, want_no_waste_at_end=False, N_waste=10, z=10, height=10, communication_enabled=None, seed=None):
         super().__init__(seed=seed)
+
+        config_path = os.path.join(os.path.dirname(__file__), "config.json")
+        config_data = {}
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as config_file:
+                config_data = json.load(config_file)
+
+        if communication_enabled is None:
+            communication_value = config_data.get("communication", False)
+            if isinstance(communication_value, str):
+                communication_enabled = communication_value.strip().lower() == "true"
+            else:
+                communication_enabled = bool(communication_value)
+        self.communication_enabled = communication_enabled
+
+        if MessageService.get_instance() is not None:
+            MessageService._MessageService__instance = None
+        MessageService(self, instant_delivery=True)
 
         # Si want_no_waste_at_end, arrondir aux multiples appropriés
         if want_no_waste_at_end:
@@ -112,6 +134,9 @@ then perform the changes entailed by the action."""
 
         # if not hasattr(agent, "carried_waste"):
         #     agent.carried_waste = None
+
+        if action == "wait":
+            return self.build_percepts(agent)
 
         if action in ["move_up", "move_down", "move_left", "move_right"]:
             x, y = agent.pos
