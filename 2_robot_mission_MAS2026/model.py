@@ -27,6 +27,11 @@ class RobotMission(Model):
         self.count_collected_red_waste = 0
         self.waste_counts = {"green": N_waste_green, "yellow": N_waste_yellow, "red": N_waste_red}
         self.initial_waste_counts = {"green": N_waste_green, "yellow": N_waste_yellow, "red": N_waste_red}
+        # Number of visits per cell by robots, indexed as [y][x].
+        self.robot_visit_counts = [
+            [0 for _ in range(self.grid.width)]
+            for _ in range(self.grid.height)
+        ]
 
         #place agents in their respective zones
         agent_classes = [greenAgent, yellowAgent, redAgent]
@@ -36,6 +41,7 @@ class RobotMission(Model):
                 x = self.random.randrange(i*z, (i+1)*z)
                 y = self.random.randrange(self.grid.height)
                 self.grid.place_agent(agent, (x, y))
+                self.robot_visit_counts[y][x] += 1
                 print(f"Placing {agent.__class__.__name__} with id {agent.unique_id} at ({x}, {y}) in zone {i+1}")
         
         #place radioactivity according to the zones
@@ -122,6 +128,7 @@ then perform the changes entailed by the action."""
                 return {"error": "Move out of bounds", "percepts": self.build_percepts(agent)}
 
             self.grid.move_agent(agent, new_pos)
+            self.robot_visit_counts[new_pos[1]][new_pos[0]] += 1
             return self.build_percepts(agent)
 
         if action == "pick_up":

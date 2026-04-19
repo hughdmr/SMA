@@ -182,7 +182,11 @@ def waste_bar_chart_component(model):
     bars = ax.bar(labels, values, color=colors)
     ax.set_title("Etat des dechets")
     n_waste = model_params["N_waste"]["value"]
-    ax.set_xlabel(f"Verif : Déposés = (Vi-Vf)/2 + (Ji-Jf)/2 + (Ri-Rf), \n on a bien {counts["Depose"]} = ({n_waste}-{counts['Vert']})/2 + ({n_waste}-{counts['Jaune']})/2 + ({n_waste}-{counts['Rouge']})/2")
+    ax.set_xlabel(
+        f"Verif : Deposes = (Vi-Vf)/2 + (Ji-Jf)/2 + (Ri-Rf),\n"
+        f"on a bien {counts['Depose']} = ({n_waste}-{counts['Vert']})/2 + "
+        f"({n_waste}-{counts['Jaune']})/2 + ({n_waste}-{counts['Rouge']})"
+    )
     ax.set_ylabel("Nombre")
     ax.set_ylim(0, max(values + [1]) + 1)
 
@@ -198,9 +202,37 @@ def waste_bar_chart_component(model):
 
     solara.FigureMatplotlib(fig, format="png", bbox_inches="tight")
 
+
+@solara.component
+def robot_movement_heatmap_component(model):
+    update_counter.get()
+
+    fig = Figure(figsize=(8, 3.2))
+    ax = fig.subplots()
+
+    heatmap = model.robot_visit_counts
+    max_count = max((max(row) for row in heatmap), default=0)
+
+    im = ax.imshow(
+        heatmap,
+        origin="lower",
+        cmap="YlOrRd",
+        vmin=0,
+        vmax=max(max_count, 1),
+        interpolation="nearest",
+        aspect="auto",
+    )
+
+    ax.set_title("Heatmap des mouvements des robots")
+    ax.set_xlabel("Position X")
+    ax.set_ylabel("Position Y")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Passages")
+
+    solara.FigureMatplotlib(fig, format="png", bbox_inches="tight")
+
 page = SolaraViz(
     initial_model,
-    components=[custom_component, waste_bar_chart_component],
+    components=[custom_component, waste_bar_chart_component, robot_movement_heatmap_component],
     model_params=model_params,
     name="Robot Mission"
 )
