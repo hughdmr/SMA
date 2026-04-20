@@ -1,5 +1,7 @@
 # SMA - Robot Mission MAS
 
+Projet SMA - Hugues d'Hardemare, Louis Vauterin.
+
 Projet de simulation multi-agents (Mesa + Solara) dans lequel des robots coopèrent pour nettoyer, transformer et évacuer des déchets radioactifs sur une grille découpée en zones.
 
 Le projet a été construit en plusieurs itérations, avec une communication de plus en plus riche et pilotable via `config.json`.
@@ -16,28 +18,27 @@ L'objectif global est de maximiser le débit de transformation/évacuation en mi
 
 ## 2. Architecture du code
 
-Fichiers principaux:
-
-- `2_robot_mission_MAS2026/model.py`
-- `2_robot_mission_MAS2026/agents.py`
-- `2_robot_mission_MAS2026/objects.py`
-- `2_robot_mission_MAS2026/server.py`
-- `2_robot_mission_MAS2026/config.json`
-
-Module de communication réutilisable:
-
-- `2_robot_mission_MAS2026/communication/agent/CommunicatingAgent.py`
-- `2_robot_mission_MAS2026/communication/message/Message.py`
-- `2_robot_mission_MAS2026/communication/message/MessageService.py`
-- `2_robot_mission_MAS2026/communication/mailbox/Mailbox.py`
-
-Rôles:
+Modèle multi-agents :
 
 - `model.py` gère l'environnement, les règles de transition et les compteurs globaux.
 - `agents.py` contient les stratégies des robots et les protocoles de communication.
-- `server.py` expose la visualisation interactive Solara.
+- `objects.py`
+
+Serveur et configuration :
+
+- `server.py` pour lancer l'interface Solara.
+- `config.json` pour configurer l'expérience
+
+Module de communication :
+
+- `communication/agent/CommunicatingAgent.py`
+- `communication/message/Message.py`
+- `communication/message/MessageService.py`
+- `communication/mailbox/Mailbox.py`
 
 ## 3. Exécution
+
+## 1ere option : lancer une expérience
 
 Se placer dans `2_robot_mission_MAS2026/`, puis lancer:
 
@@ -45,9 +46,7 @@ Se placer dans `2_robot_mission_MAS2026/`, puis lancer:
 solara run run.py
 ```
 
-La page Solara se met à jour en continu pendant la simulation.
-
-Benchmark des versions (temps moyen pour tout disposer):
+## 2eme option : Benchmark des différentes versions :
 
 ```bash
 cd 2_robot_mission_MAS2026
@@ -68,12 +67,12 @@ Graphes générés automatiquement (dans `2_robot_mission_MAS2026/benchmark_outp
 
 ![Steps Distribution](2_robot_mission_MAS2026/benchmark_outputs/benchmark_steps_distribution.png)
 
-## 4. Dynamique de base (sans communication)
+## 4. Fonctionnement général
 
 Chaque robot suit un cycle perception -> délibération -> action:
 
-1. Perception locale (voisins cardinalement adjacents).
-2. Sélection d'une cible locale (déchet pertinent si visible, sinon exploration).
+1. Perception locale avec les voisins cardinalement adjacents.
+2. Sélection d'une cible locale : déchet pertinent si visible, sinon exploration.
 3. Action choisie parmi `move_up`, `move_down`, `move_left`, `move_right`, `pick_up`, `transform`, `drop`, `wait`.
 
 Le modèle applique ensuite l'action via `Model.do(...)` et met à jour:
@@ -83,7 +82,7 @@ Le modèle applique ensuite l'action via `Model.do(...)` et met à jour:
 - les métriques de progression,
 - la heatmap de mouvement.
 
-## 5. Historique des itérations
+## 5. Comparaison des versions
 
 ### Synthèse des différences
 
@@ -114,36 +113,28 @@ Protocole de handoff explicite:
 - `need_handoff`: un robot source annonce qu'il a besoin d'un robot de couleur cible.
 - `claim_handoff`: un robot libre de la couleur cible se porte volontaire.
 - `commit_handoff`: la source choisit un helper et confirme le rendez-vous.
-
-Améliorations ajoutées dans les dernières itérations advanced:
-
 - Position de handoff contrainte à la frontière de zone (atteignable par le helper).
 - Cooldowns anti-spam sur les messages (`have_waste`, `need_handoff`).
 - Timeout de commit et timeout d'assistance pour éviter les missions bloquées.
 - Sélection du helper par proximité du point de handoff (pas seulement par ID).
-
-Effets attendus:
-
-- moins de temps perdu à "se trouver" par hasard,
-- meilleur enchaînement entre transformation et reprise du déchet,
 - réduction de la latence entre étapes vert -> jaune -> rouge.
 
-## 6. Configuration complète (`config.json`)
+## 6. Configuration `config.json`
 
-Flags principaux:
+Configuration principale:
 
 - `communication`: active la communication de base.
 - `advanced_communication`: active le protocole avancé, uniquement utile si `communication=true`.
 - `advanced_comm_tuning`: paramètres de tuning du mode avancé.
 
-Clés de `advanced_comm_tuning`:
+Configuration de `advanced_comm_tuning`:
 
 - `have_waste_cooldown`: nombre de steps entre deux broadcasts `have_waste`.
 - `need_handoff_cooldown`: nombre de steps entre deux broadcasts `need_handoff`.
 - `commit_timeout_steps`: timeout avant reset d'un helper engagé qui n'aboutit pas.
 - `assist_timeout_steps`: timeout avant abandon d'une mission d'assistance obsolète.
 
-Autres champs actuellement présents:
+Autres configurations:
 
 - `want_no_waste_at_end`: option de distribution/arrondi des déchets initiaux.
 - `target_when_None`: stratégie de cible fallback.
@@ -172,8 +163,6 @@ Règle d'initialisation quand `want_no_waste_at_end=true`:
 2. zone jaune: arrondi au multiple de 2,
 3. zone rouge: non contrainte (tout rouge est directement disposables).
 
-Ces quantités arrondies sont maintenant réellement utilisées lors du placement initial des déchets sur la grille.
-
 Puis:
 
 ```json
@@ -188,42 +177,35 @@ Puis:
 L'UI Solara contient:
 
 1. Vue grille avec zones colorées (vert/jaune/rouge).
-2. Compteur de dépôt affiché sur la cellule de disposal.
-3. Histogramme des déchets (`green`, `yellow`, `red`, `disposed`).
-4. Heatmap de passages des robots.
-5. Panneau de métriques de communication en temps réel.
+2. Les déchets sont représentés par des carrés de leur couleur respective.
+3. Des robots sont représentés par des cercles de leur couleur respective.:
+4. Si les robots portent un déchet de leurs couleurs, ils ont un point central
+5. Si les robots portent un déchet transformé (autre couleur), ils ont un 1 central.
+6. Compteur de dépôt affiché sur la cellule de disposal.
+7. Histogramme des déchets (`green`, `yellow`, `red`, `disposed`).
+8. Heatmap de passages des robots.
+9. Panneau de métriques de communication en temps réel.
 
-## 8. Métriques de communication
+![Solara](2_robot_mission_MAS2026/benchmark_outputs/solara1.png)
 
-Compteurs actuellement suivis:
+![Grid with waste and robot](2_robot_mission_MAS2026/benchmark_outputs/solara2.png)
 
-- `have_waste_sent`
-- `have_waste_received`
-- `need_handoff_sent`
-- `need_handoff_received`
-- `claim_handoff_sent`
-- `claim_handoff_received`
-- `commit_handoff_sent`
-- `commit_handoff_received`
-- `assist_drops`
-- `assist_pickups`
+## 8. Choix et limites
 
-Ces métriques servent à comparer quantitativement les variantes de stratégie.
-
-## 9. Choix d'implémentation
+Choix d'implémentation :
 
 - Communication découplée dans un module dédié pour rester réutilisable.
 - Activation par flags pour permettre des expériences A/B sans changer le code.
 - Ajout incrémental des stratégies pour conserver un mode "legacy" stable.
 - Instrumentation (compteurs + visualisation) pour valider les gains empiriquement.
 
-## 10. Limites connues
+Limites :
 
 - Le scheduler aléatoire peut introduire des écarts entre runs.
 - Certains protocoles avancés peuvent peu s'activer sur des runs trop courts.
 - Les paramètres de `config.json` ne sont pas tous encore branchés comme hyperparamètres dynamiques dans l'UI.
 
-## 11. Protocole d'expérimentation conseillé
+## 9. Protocole d'expérimentation conseillé
 
 1. Fixer `N_agents`, `N_waste`, `z`, `height`.
 2. Lancer 3 séries de runs:
@@ -235,7 +217,3 @@ Ces métriques servent à comparer quantitativement les variantes de stratégie.
 	 - nombre de déchets déposés,
 	 - densité de la heatmap,
 	 - activation des compteurs de messages.
-
-## 12. Auteurs
-
-Projet SMA - Hugues d'Hardemare, Louis Vauterin.
